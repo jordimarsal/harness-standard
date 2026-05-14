@@ -1,0 +1,35 @@
+{
+  "$schema_comment": "Hooks that automate verification. The harness executes these, not the agent, so they cannot be bypassed.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{TEST_CMD}} 2>&1 | tail -3",
+            "description": "After editing or writing files, run tests and show summary."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./init.sh > /tmp/harness_init.log 2>&1 && echo '[harness] init.sh OK' || (echo '[harness] init.sh FAILED — check /tmp/harness_init.log before closing' && tail -20 /tmp/harness_init.log)",
+            "description": "Before closing the session, force a full verification."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(./init.sh)",
+      "Bash({{TEST_CMD}})",
+      "Bash({{BUILD_CMD}})"
+    ]
+  }
+}
