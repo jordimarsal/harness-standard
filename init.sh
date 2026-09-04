@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--force]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -12,7 +12,9 @@
 #   - docs/ at the project root
 #   - Everything else grouped under harness/
 #
-# Safe: refuses to overwrite an existing harness.
+# Safe: refuses to overwrite an existing harness. Use --force to reinstall:
+# it refreshes templates but preserves user state (harness/feature_list.json,
+# harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md).
 
 set -euo pipefail
 
@@ -39,13 +41,15 @@ fi
 
 # ── Tool selection (claude / opencode) ─────────────────
 TOOL=""
+FORCE=0
 for arg in "$@"; do
   case "$arg" in
     --tool=claude)   TOOL="claude" ;;
     --tool=opencode) TOOL="opencode" ;;
+    --force) FORCE=1 ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--force]"
       exit 1
       ;;
   esac
@@ -69,9 +73,14 @@ fi
 info "Tool: $TOOL"
 
 # ── Check existing harness ─────────────────────────────
-if [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
+if [ "$FORCE" -eq 1 ]; then
+  info "Force reinstall: refreshing templates."
+  info "Preserved if present: harness/feature_list.json, harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md"
+  rm -rf .claude .opencode
+  rm -f CLAUDE.md AGENTS.md opencode.json
+elif [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
   fail "A harness is already installed in this directory (harness/, CLAUDE.md, AGENTS.md, .claude/ or .opencode/ exists)."
-  fail "Remove existing harness files before reinstalling."
+  fail "Remove existing harness files before reinstalling, or use --force to reinstall (keeps user state)."
   exit 1
 fi
 
@@ -155,26 +164,34 @@ mkdir -p docs
 cp "$TEMPLATES_DIR/docs/specs.md" ./docs/specs.md
 cp "$TEMPLATES_DIR/docs/verification.md" ./docs/verification.md
 
-sed -e "s|{{ARCHITECTURE_PRINCIPLES}}|Define the architectural principles for this project here.|g" \
-    -e "s|{{DATA_FLOW}}|Describe the data flow here.|g" \
-    -e "s|{{ARCHITECTURE_DONT}}|List what NOT to do here.|g" \
-    "$TEMPLATES_DIR/docs/architecture.md.tpl" > docs/architecture.md
+if [ ! -f "docs/architecture.md" ]; then
+  sed -e "s|{{ARCHITECTURE_PRINCIPLES}}|Define the architectural principles for this project here.|g" \
+      -e "s|{{DATA_FLOW}}|Describe the data flow here.|g" \
+      -e "s|{{ARCHITECTURE_DONT}}|List what NOT to do here.|g" \
+      "$TEMPLATES_DIR/docs/architecture.md.tpl" > docs/architecture.md
+fi
 
-sed -e "s|{{STYLE_RULES}}|Define coding style rules here.|g" \
-    -e "s|{{NAMING_RULES}}|Define naming conventions here.|g" \
-    -e "s|{{FILE_STRUCTURE}}|Define file structure rules here.|g" \
-    -e "s|{{TEST_RULES}}|Define testing rules here.|g" \
-    -e "s|{{ERROR_HANDLING}}|Define error handling rules here.|g" \
-    "$TEMPLATES_DIR/docs/conventions.md.tpl" > docs/conventions.md
+if [ ! -f "docs/conventions.md" ]; then
+  sed -e "s|{{STYLE_RULES}}|Define coding style rules here.|g" \
+      -e "s|{{NAMING_RULES}}|Define naming conventions here.|g" \
+      -e "s|{{FILE_STRUCTURE}}|Define file structure rules here.|g" \
+      -e "s|{{TEST_RULES}}|Define testing rules here.|g" \
+      -e "s|{{ERROR_HANDLING}}|Define error handling rules here.|g" \
+      "$TEMPLATES_DIR/docs/conventions.md.tpl" > docs/conventions.md
+fi
 
 # Everything else groups under harness/
 mkdir -p harness/progress harness/specs
 cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
-cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
-cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
+[ -f "./harness/progress/current.md" ] || cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
+[ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
 
-sed "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
-    "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
+if [ ! -f "harness/feature_list.json" ]; then
+  sed "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+      "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
+else
+  ok "Keeping existing harness/feature_list.json"
+fi
 
 # Verification script becomes harness/init.sh
 cp "$SCRIPT_DIR/init-verify.sh" ./harness/init.sh

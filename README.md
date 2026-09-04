@@ -29,6 +29,16 @@ The installer asks whether the harness will be driven by **claude** or **opencod
 
 Everything else groups under `harness/`; only `docs/` stays at the project root.
 
+### Reinstalling
+
+The installer refuses to run twice in the same project. To reinstall (e.g. to switch tool or refresh templates), use `--force`:
+
+```bash
+/path/to/harness-standard/init.sh --force --tool=opencode
+```
+
+`--force` refreshes all templates but preserves user state: `harness/feature_list.json`, `harness/progress/`, `harness/specs/`, `docs/architecture.md` and `docs/conventions.md`.
+
 ## After installation
 
 1. Edit `docs/architecture.md` with your project's architecture principles.

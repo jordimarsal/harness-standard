@@ -229,6 +229,59 @@ test_python_stack() {
   fi
 }
 
+test_force_reinstall_preserves_state() {
+  local t="--force reinstalls templates and preserves user state"
+  run_test "$t"
+  local d; d=$(new_project "force-same")
+  (cd "$d" && "$INIT" --tool=claude >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: first install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # simulate user state
+  echo '{"custom": true}' > "$d/harness/feature_list.json"
+  echo "session in progress" > "$d/harness/progress/current.md"
+  echo "my architecture" > "$d/docs/architecture.md"
+  echo "my conventions" > "$d/docs/conventions.md"
+  mkdir -p "$d/harness/specs/myfeature"
+  echo "req" > "$d/harness/specs/myfeature/requirements.md"
+  (cd "$d" && "$INIT" --force --tool=claude >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: force install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # user state preserved
+  assert_grep "$t" '"custom": true' "$d/harness/feature_list.json"
+  assert_grep "$t" "session in progress" "$d/harness/progress/current.md"
+  assert_grep "$t" "my architecture" "$d/docs/architecture.md"
+  assert_grep "$t" "my conventions" "$d/docs/conventions.md"
+  assert_file "$t" "$d/harness/specs/myfeature/requirements.md"
+  # templates refreshed
+  assert_file "$t" "$d/CLAUDE.md"
+  assert_file "$t" "$d/.claude/settings.json"
+  assert_executable "$t" "$d/harness/init.sh"
+  assert_file "$t" "$d/harness/CHECKPOINTS.md"
+  assert_file "$t" "$d/docs/specs.md"
+}
+
+test_force_switch_tool() {
+  local t="--force with different tool removes old entry point and tool dir"
+  run_test "$t"
+  local d; d=$(new_project "force-switch")
+  (cd "$d" && "$INIT" --tool=claude >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: first install failed"); return
+  }
+  PASS=$((PASS + 1))
+  (cd "$d" && "$INIT" --force --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: force switch failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/AGENTS.md"
+  assert_file "$t" "$d/opencode.json"
+  assert_file "$t" "$d/.opencode/agent/leader.md"
+  assert_no_file "$t" "$d/CLAUDE.md"
+  assert_no_file "$t" "$d/.claude"
+  assert_harness_layout "$t" "$d"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -238,6 +291,8 @@ test_opencode_mode_generic
 test_interactive_prompt
 test_invalid_tool_rejected
 test_reinstall_refused
+test_force_reinstall_preserves_state
+test_force_switch_tool
 test_verify_script_runs
 test_python_stack
 
