@@ -6,15 +6,15 @@
 
 ## C1 — Harness is complete
 
-- [ ] The 4 base files exist: `AGENTS.md`, `init.sh`, `feature_list.json`, `progress/current.md`.
+- [ ] The 4 base files exist: `CLAUDE.md` or `AGENTS.md` (entry point at project root), `harness/init.sh`, `harness/feature_list.json`, `harness/progress/current.md`.
 - [ ] The 3 docs exist: `docs/architecture.md`, `docs/conventions.md`, `docs/verification.md`.
-- [ ] `./init.sh` finishes with exit code 0.
+- [ ] `harness/init.sh` finishes with exit code 0.
 
 ## C2 — State is coherent
 
-- [ ] At most one feature `in_progress` in `feature_list.json`.
+- [ ] At most one feature `in_progress` in `harness/feature_list.json`.
 - [ ] Every `done` feature has passing tests.
-- [ ] `progress/current.md` is empty or describes the active session (no stale data).
+- [ ] `harness/progress/current.md` is empty or describes the active session (no stale data).
 
 ## C3 — Code respects architecture
 
@@ -24,21 +24,21 @@
 ## C4 — Verification is real
 
 - [ ] `tests/` has at least one test per `src/` module.
-- [ ] All tests pass (`./init.sh` green).
+- [ ] All tests pass (`harness/init.sh` green).
 
 ## C5 — Session closed properly
 
 - [ ] No suspicious untracked files.
-- [ ] `progress/history.md` has an entry for the last session.
+- [ ] `harness/progress/history.md` has an entry for the last session.
 - [ ] The last worked feature reflects its correct state.
 
 ## C6 — Spec Driven Development
 
-- [ ] Every feature in `spec_ready`, `in_progress`, or `done` has its `specs/<name>/` folder with 3 files: `requirements.md`, `design.md`, `tasks.md`.
+- [ ] Every feature in `spec_ready`, `in_progress`, or `done` has its `harness/specs/<name>/` folder with 3 files: `requirements.md`, `design.md`, `tasks.md`.
 - [ ] `requirements.md` uses strict EARS notation.
 - [ ] Every `done` feature has all tasks marked `[x]` in `tasks.md`.
 - [ ] Each `R<n>` from `requirements.md` is covered by at least one concrete test in `tests/`.
 
 ---
 
-**How to use this file:** a reviewer agent (`.claude/agents/reviewer.md`) walks through each checkbox, marks `[x]` or `[ ]`, and rejects session closure if boxes remain unchecked in C1-C6.
+**How to use this file:** a reviewer agent (`.claude/agents/reviewer.md` in Claude mode, `.opencode/agent/reviewer.md` in opencode mode) walks through each checkbox, marks `[x]` or `[ ]`, and rejects session closure if boxes remain unchecked in C1-C6.

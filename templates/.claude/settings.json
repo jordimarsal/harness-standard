@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./init.sh > /tmp/harness_init.log 2>&1 && echo '[harness] init.sh OK' || (echo '[harness] init.sh FAILED — check /tmp/harness_init.log before closing' && tail -20 /tmp/harness_init.log)",
+            "command": "harness/init.sh > /tmp/harness_init.log 2>&1 && echo '[harness] init.sh OK' || (echo '[harness] init.sh FAILED — check /tmp/harness_init.log before closing' && tail -20 /tmp/harness_init.log)",
             "description": "Before closing the session, force a full verification."
           }
         ]
@@ -27,7 +27,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(./init.sh)",
+      "Bash(harness/init.sh)",
       "Bash({{TEST_CMD}})",
       "Bash({{BUILD_CMD}})"
     ]

@@ -1,7 +1,9 @@
 ---
-name: reviewer
+mode: subagent
 description: Automated reviewer. Approves or rejects work against docs/, harness/specs/<name>/, and harness/CHECKPOINTS.md.
-tools: Read, Glob, Grep, Bash
+tools:
+  write: false
+  edit: false
 ---
 
 # Reviewer Agent

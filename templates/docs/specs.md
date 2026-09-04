@@ -9,14 +9,14 @@ gates at each transition.
 ## Directory Structure
 
 ```
-specs/
+harness/specs/
   <feature-name>/
     requirements.md   — What the system must do (EARS-formatted requirements)
     design.md         — How the system will satisfy the requirements
     tasks.md          — Ordered implementation steps
 ```
 
-Each feature lives in its own directory under `specs/`. The directory name becomes the
+Each feature lives in its own directory under `harness/specs/`. The directory name becomes the
 canonical feature identifier used in traceability, status tracking, and cross-references.
 
 ---
@@ -58,7 +58,7 @@ the change. There are two approval gates:
 
 2. **Completion Gate** (`in_progress` -> `done`): A human reviews the implementation,
    verifies that all tests pass, confirms traceability (every R\<n\> maps to a test and
-   implementation), and ensures `./init.sh` finishes with `[OK]`.
+   implementation), and ensures `harness/init.sh` finishes with `[OK]`.
 
 No automated tooling may bypass these gates. The reviewer leaves a written approval
 record in the feature directory (e.g., a commit message or comment referencing the
@@ -184,7 +184,7 @@ During implementation, the implementer creates a progress document in the featur
 directory:
 
 ```
-specs/<feature-name>/progress/impl_<name>.md
+harness/progress/impl_<name>.md
 ```
 
 Where `<name>` identifies the implementer or work session. This document must contain a

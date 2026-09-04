@@ -1,7 +1,6 @@
 ---
-name: implementer
+mode: subagent
 description: Worker. Implements exactly ONE feature from its approved spec. Writes code, writes tests, self-verifies.
-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 # Implementer Agent
@@ -15,7 +14,7 @@ Your job is to implement **exactly one** feature from `harness/feature_list.json
 
 ## Protocol
 
-1. Read `CLAUDE.md`, `docs/architecture.md`, `docs/conventions.md`.
+1. Read `AGENTS.md`, `docs/architecture.md`, `docs/conventions.md`.
 2. Read the complete spec at `harness/specs/<name>/`. Each `T<n>` from `tasks.md` is what you do; each `R<n>` from `requirements.md` is what must be true at the end.
 3. Log in `harness/progress/current.md`:
    - `Feature in progress: <id> — <name>`

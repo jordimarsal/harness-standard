@@ -76,10 +76,10 @@ def test_login():
 Every test must assert something specific about the output, state change, or returned
 value. At minimum, verify the return type and at least one expected property.
 
-### Marking done without init.sh
+### Marking done without harness/init.sh
 
-No feature may be marked as `done` unless `./init.sh` completes successfully. This is
-the final gate. If `init.sh` fails for any reason, the feature remains `in_progress`.
+No feature may be marked as `done` unless `harness/init.sh` completes successfully. This is
+the final gate. If `harness/init.sh` fails for any reason, the feature remains `in_progress`.
 
 ---
 
@@ -88,7 +88,7 @@ the final gate. If `init.sh` fails for any reason, the feature remains `in_progr
 The last step before any feature transitions to `done` is:
 
 ```
-./init.sh
+harness/init.sh
 ```
 
 The script must finish with the output:

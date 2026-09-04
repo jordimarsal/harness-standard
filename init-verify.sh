@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # init-verify.sh — Project verification script
 #
-# This script is copied to the project root as init.sh during harness installation.
+# This script is copied to harness/init.sh during harness installation.
+# Run from the project root: ./harness/init.sh
 # Run at session start and before marking any feature as done.
 
 set -u
@@ -18,7 +19,27 @@ EXIT_CODE=0
 
 echo "── 1. Checking harness files ──────────────────────────"
 
-for f in AGENTS.md feature_list.json progress/current.md docs/architecture.md docs/conventions.md docs/verification.md docs/specs.md CHECKPOINTS.md CLAUDE.md; do
+# Entry point + tool directory at the project root (claude or opencode)
+if [ -f "CLAUDE.md" ]; then
+  ok "Exists CLAUDE.md"
+  ENTRY_OK=1
+elif [ -f "AGENTS.md" ]; then
+  ok "Exists AGENTS.md"
+  ENTRY_OK=1
+else
+  fail "Missing entry point: CLAUDE.md or AGENTS.md"
+  EXIT_CODE=1
+  ENTRY_OK=0
+fi
+
+if [ -d ".claude" ] || [ -d ".opencode" ]; then
+  ok "Exists .claude/ or .opencode/"
+else
+  fail "Missing tool directory: .claude/ or .opencode/"
+  EXIT_CODE=1
+fi
+
+for f in harness/CHECKPOINTS.md harness/feature_list.json harness/progress/current.md docs/architecture.md docs/conventions.md docs/verification.md docs/specs.md; do
   if [ ! -f "$f" ]; then
     fail "Missing base file: $f"
     EXIT_CODE=1
@@ -27,14 +48,21 @@ for f in AGENTS.md feature_list.json progress/current.md docs/architecture.md do
   fi
 done
 
+if [ -d "harness/specs" ]; then
+  ok "Exists harness/specs/"
+else
+  fail "Missing directory: harness/specs/"
+  EXIT_CODE=1
+fi
+
 echo ""
-echo "── 2. Validating feature_list.json ────────────────────"
+echo "── 2. Validating harness/feature_list.json ────────────"
 
 if command -v python3 >/dev/null 2>&1; then
   python3 - <<'PY'
 import json, os, sys
 try:
-    data = json.load(open("feature_list.json"))
+    data = json.load(open("harness/feature_list.json"))
     features = data.get("features", [])
     valid = {"pending", "spec_ready", "in_progress", "done", "blocked"}
     in_progress = [f for f in features if f.get("status") == "in_progress"]
@@ -48,7 +76,7 @@ try:
             print(f"[FAIL]  Invalid status in feature {f.get('id')}: {f.get('status')}")
             sys.exit(1)
         if f.get("status") in requires_spec:
-            spec_dir = os.path.join("specs", f["name"])
+            spec_dir = os.path.join("harness", "specs", f["name"])
             for fname in ("requirements.md", "design.md", "tasks.md"):
                 if not os.path.isfile(os.path.join(spec_dir, fname)):
                     spec_errors.append(
@@ -59,18 +87,18 @@ try:
         for e in spec_errors:
             print(f"[FAIL]  {e}")
         sys.exit(1)
-    print(f"[OK]    feature_list.json valid ({len(features)} features)")
+    print(f"[OK]    harness/feature_list.json valid ({len(features)} features)")
     if in_progress:
         print(f"[OK]    Feature in progress: {in_progress[0]['name']}")
 except SystemExit:
     raise
 except Exception as e:
-    print(f"[FAIL]  feature_list.json invalid: {e}")
+    print(f"[FAIL]  harness/feature_list.json invalid: {e}")
     sys.exit(1)
 PY
   if [ $? -ne 0 ]; then EXIT_CODE=1; fi
 else
-  warn "python3 not available — skipping feature_list.json validation"
+  warn "python3 not available — skipping harness/feature_list.json validation"
 fi
 
 echo ""

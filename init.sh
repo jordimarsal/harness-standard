@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode]
 #
-# Detects tech stack, copies templates, adapts configuration.
+# Detects tech stack, asks which AI tool drives the harness (claude / opencode),
+# copies templates and adapts configuration.
+#
+# Destination layout:
+#   - Entry point (CLAUDE.md or AGENTS.md) at the project root
+#   - Tool directory (.claude/ or .opencode/) at the project root
+#   - docs/ at the project root
+#   - Everything else grouped under harness/
+#
 # Safe: refuses to overwrite an existing harness.
 
 set -euo pipefail
@@ -29,9 +37,40 @@ if [ ! -d "$TEMPLATES_DIR" ]; then
   exit 1
 fi
 
+# ── Tool selection (claude / opencode) ─────────────────
+TOOL=""
+for arg in "$@"; do
+  case "$arg" in
+    --tool=claude)   TOOL="claude" ;;
+    --tool=opencode) TOOL="opencode" ;;
+    *)
+      fail "Unknown argument: $arg"
+      fail "Usage: init.sh [--tool=claude|opencode]"
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$TOOL" ]; then
+  echo ""
+  echo "Which AI tool will drive this harness?"
+  echo "  [c]laude    — Claude Code (generates CLAUDE.md + .claude/)"
+  echo "  [o]pencode  — opencode   (generates AGENTS.md + .opencode/)"
+  while [ -z "$TOOL" ]; do
+    printf "Choice [c/o]: "
+    read -r answer
+    case "$answer" in
+      c|claude)   TOOL="claude" ;;
+      o|opencode) TOOL="opencode" ;;
+      *) warn "Please answer 'c' (claude) or 'o' (opencode)." ;;
+    esac
+  done
+fi
+info "Tool: $TOOL"
+
 # ── Check existing harness ─────────────────────────────
-if [ -f "AGENTS.md" ] || [ -f "CHECKPOINTS.md" ]; then
-  fail "A harness is already installed in this directory (AGENTS.md or CHECKPOINTS.md exists)."
+if [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
+  fail "A harness is already installed in this directory (harness/, CLAUDE.md, AGENTS.md, .claude/ or .opencode/ exists)."
   fail "Remove existing harness files before reinstalling."
   exit 1
 fi
@@ -111,36 +150,11 @@ PROJECT_NAME="$(basename "$(pwd)")"
 # ── Copy templates ─────────────────────────────────────
 info "Installing harness templates..."
 
-# Shared files
-cp "$TEMPLATES_DIR/AGENTS.md" ./AGENTS.md
-cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./CHECKPOINTS.md
-
-# .claude directory
-mkdir -p .claude/agents
-for agent in leader spec-author implementer reviewer; do
-  cp "$TEMPLATES_DIR/.claude/agents/${agent}.md" ".claude/agents/${agent}.md"
-done
-
-# Settings with variable substitution
-mkdir -p .claude
-sed -e "s|{{TEST_CMD}}|$TEST_CMD|g" \
-    -e "s|{{BUILD_CMD}}|$BUILD_CMD|g" \
-    "$TEMPLATES_DIR/.claude/settings.json" > .claude/settings.json
-
-# Progress
-mkdir -p progress
-cp "$TEMPLATES_DIR/progress/current.md" ./progress/current.md
-cp "$TEMPLATES_DIR/progress/history.md" ./progress/history.md
-
-# Specs
-mkdir -p specs
-
-# Docs
+# docs/ stays at the project root
 mkdir -p docs
 cp "$TEMPLATES_DIR/docs/specs.md" ./docs/specs.md
 cp "$TEMPLATES_DIR/docs/verification.md" ./docs/verification.md
 
-# Architecture and conventions templates (user must fill)
 sed -e "s|{{ARCHITECTURE_PRINCIPLES}}|Define the architectural principles for this project here.|g" \
     -e "s|{{DATA_FLOW}}|Describe the data flow here.|g" \
     -e "s|{{ARCHITECTURE_DONT}}|List what NOT to do here.|g" \
@@ -153,25 +167,47 @@ sed -e "s|{{STYLE_RULES}}|Define coding style rules here.|g" \
     -e "s|{{ERROR_HANDLING}}|Define error handling rules here.|g" \
     "$TEMPLATES_DIR/docs/conventions.md.tpl" > docs/conventions.md
 
-# Stack-specific CLAUDE.md
-if [ -f "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl" ]; then
-  cp "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl" ./CLAUDE.md
-else
-  cp "$TEMPLATES_DIR/stacks/generic/CLAUDE.md.tpl" ./CLAUDE.md
-fi
+# Everything else groups under harness/
+mkdir -p harness/progress harness/specs
+cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
+cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
+cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
 
-# Feature list
-if [ ! -f "feature_list.json" ]; then
-  sed "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
-      "$TEMPLATES_DIR/feature_list.json" > feature_list.json
-  ok "Created feature_list.json"
-else
-  warn "feature_list.json already exists — keeping existing file"
-fi
+sed "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+    "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
 
-# Copy project-level verification script
-cp "$SCRIPT_DIR/init-verify.sh" ./init.sh
-chmod +x ./init.sh
+# Verification script becomes harness/init.sh
+cp "$SCRIPT_DIR/init-verify.sh" ./harness/init.sh
+chmod +x ./harness/init.sh
+
+# Tool-specific files at the project root
+if [ "$TOOL" = "claude" ]; then
+  mkdir -p .claude/agents
+  for agent in leader spec-author implementer reviewer; do
+    cp "$TEMPLATES_DIR/.claude/agents/${agent}.md" ".claude/agents/${agent}.md"
+  done
+
+  sed -e "s|{{TEST_CMD}}|$TEST_CMD|g" \
+      -e "s|{{BUILD_CMD}}|$BUILD_CMD|g" \
+      "$TEMPLATES_DIR/.claude/settings.json" > .claude/settings.json
+
+  if [ -f "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl" ]; then
+    cp "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl" ./CLAUDE.md
+  else
+    cp "$TEMPLATES_DIR/stacks/generic/CLAUDE.md.tpl" ./CLAUDE.md
+  fi
+else
+  mkdir -p .opencode/agent
+  for agent in leader spec-author implementer reviewer; do
+    cp "$TEMPLATES_DIR/.opencode/agent/${agent}.md" ".opencode/agent/${agent}.md"
+  done
+
+  sed -e "s|{{TEST_CMD}}|$TEST_CMD|g" \
+      -e "s|{{BUILD_CMD}}|$BUILD_CMD|g" \
+      "$TEMPLATES_DIR/opencode.json" > opencode.json
+
+  cp "$TEMPLATES_DIR/AGENTS.md" ./AGENTS.md
+fi
 
 ok "Templates installed"
 
@@ -181,40 +217,62 @@ echo "── Validation ──────────────────�
 
 EXIT_CODE=0
 
-for f in CLAUDE.md AGENTS.md CHECKPOINTS.md feature_list.json progress/current.md progress/history.md docs/architecture.md docs/conventions.md docs/specs.md docs/verification.md .claude/settings.json init.sh; do
-  if [ ! -f "$f" ]; then
-    fail "Missing file: $f"
+check_file() {
+  if [ ! -f "$1" ]; then
+    fail "Missing file: $1"
     EXIT_CODE=1
   else
-    ok "Exists $f"
+    ok "Exists $1"
   fi
-done
+}
 
-for a in leader spec-author implementer reviewer; do
-  if [ ! -f ".claude/agents/${a}.md" ]; then
-    fail "Missing agent: .claude/agents/${a}.md"
+check_dir() {
+  if [ ! -d "$1" ]; then
+    fail "Missing directory: $1"
     EXIT_CODE=1
   else
-    ok "Exists .claude/agents/${a}.md"
+    ok "Exists $1"
   fi
-done
+}
 
-if [ ! -d "specs" ]; then
-  fail "Missing directory: specs/"
-  EXIT_CODE=1
+if [ "$TOOL" = "claude" ]; then
+  check_file "CLAUDE.md"
+  check_file ".claude/settings.json"
+  for a in leader spec-author implementer reviewer; do
+    check_file ".claude/agents/${a}.md"
+  done
 else
-  ok "Exists specs/"
+  check_file "AGENTS.md"
+  check_file "opencode.json"
+  for a in leader spec-author implementer reviewer; do
+    check_file ".opencode/agent/${a}.md"
+  done
 fi
+
+check_file "harness/CHECKPOINTS.md"
+check_file "harness/feature_list.json"
+check_file "harness/init.sh"
+check_file "harness/progress/current.md"
+check_file "harness/progress/history.md"
+check_file "docs/architecture.md"
+check_file "docs/conventions.md"
+check_file "docs/specs.md"
+check_file "docs/verification.md"
+check_dir "harness/specs"
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
-  ok "Harness installed successfully for stack: $STACK"
+  ok "Harness installed successfully for stack: $STACK (tool: $TOOL)"
   echo ""
   info "Next steps:"
   info "  1. Edit docs/architecture.md with your project's architecture."
   info "  2. Edit docs/conventions.md with your project's coding conventions."
-  info "  3. Add features to feature_list.json."
-  info "  4. Start Claude Code and let the leader agent guide you."
+  info "  3. Add features to harness/feature_list.json."
+  if [ "$TOOL" = "claude" ]; then
+    info "  4. Start Claude Code and let the leader agent guide you."
+  else
+    info "  4. Start opencode and let the leader agent guide you."
+  fi
 else
   fail "Harness installation incomplete. Resolve errors above."
 fi
