@@ -204,6 +204,31 @@ test_verify_script_runs() {
   fi
 }
 
+test_python_stack() {
+  local t="python stack installs pytest commands and quality-gate criteria"
+  run_test "$t"
+  local d; d=$(new_project "python-stack")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=claude >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/CLAUDE.md"
+  assert_grep "$t" "python3 -m pytest" "$d/.claude/settings.json"
+  assert_grep "$t" "Stack: Python" "$d/CLAUDE.md"
+  assert_grep "$t" "ruff" "$d/CLAUDE.md"
+  assert_grep "$t" "black" "$d/CLAUDE.md"
+  assert_grep "$t" "mypy" "$d/CLAUDE.md"
+  assert_grep "$t" "pytest" "$d/CLAUDE.md"
+  assert_grep "$t" "region " "$d/CLAUDE.md"
+  if grep -q "unittest" "$d/.claude/settings.json"; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: settings.json still references unittest")
+    echo "    FAIL: settings.json still references unittest"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -214,6 +239,7 @@ test_interactive_prompt
 test_invalid_tool_rejected
 test_reinstall_refused
 test_verify_script_runs
+test_python_stack
 
 echo ""
 echo "────────────────────────────────────────"

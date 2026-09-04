@@ -117,7 +117,7 @@ elif [ -f "build.gradle" ]; then
 elif [ -f "pom.xml" ]; then
   TEST_CMD="mvn test 2>&1"
 elif [ -d "tests" ] && command -v python3 >/dev/null 2>&1; then
-  TEST_CMD="python3 -m unittest discover -s tests -v 2>&1"
+  TEST_CMD="python3 -m pytest -q tests 2>&1"
 fi
 
 if [ -n "$TEST_CMD" ]; then

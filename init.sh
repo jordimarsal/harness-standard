@@ -132,7 +132,7 @@ case "$STACK" in
     fi
     ;;
   python)
-    TEST_CMD="python3 -m unittest discover -s tests -q"
+    TEST_CMD="python3 -m pytest -q tests"
     BUILD_CMD="echo 'no build step for python'"
     ;;
   rust)
