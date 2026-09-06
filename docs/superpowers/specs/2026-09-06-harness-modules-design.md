@@ -36,6 +36,9 @@ Migrate the content of both documents into **six optional modules** under
 **Variant chosen: light.** Zero new agent roles, zero new workflow states. Existing
 roles (spec-author, reviewer, leader) absorb the new responsibilities conditionally.
 
+Seven modules total; the seventh (`wekan-tickets`) adapts the external
+`wekan-tasks` skill (§4.7).
+
 ## 3. Module structure
 
 ```
@@ -62,6 +65,19 @@ templates/modules/
     ├── manifest.json
     └── scan.py                        → harness/tools/scan.py
 ```
+
+`wekan-tickets/` additionally exists (see §4.7):
+
+```
+wekan-tickets/
+├── manifest.json
+├── SKILL.md                           → .opencode/skill/wekan-tasks/SKILL.md
+│                                       or .claude/skills/wekan-tasks/SKILL.md
+└── wekan.json                         → harness/wekan.json (if not present)
+```
+
+Its destination depends on the chosen driving tool, so its manifest declares a
+`tool_dst` variant (see §3.1).
 
 ### 3.1 Manifest schema
 
@@ -95,6 +111,9 @@ Every module directory contains `manifest.json` with exactly these keys:
   `--force` replaces only the content between that module's own markers, never another
   module's section.
 - `verify`: paths that must exist after installation for the module to count as valid.
+- `dst` may be a plain path or an object keyed by tool for tool-dependent destinations:
+  `{"claude": ".claude/skills/wekan-tasks/SKILL.md", "opencode": ".opencode/skill/wekan-tasks/SKILL.md"}`.
+  The installer resolves it with the chosen `--tool`.
 
 ## 4. Integration points (0 new roles, 0 new states)
 
@@ -121,6 +140,10 @@ Following the existing `--tool` pattern (interactive prompt + non-interactive fl
 
 - New interactive prompts: module multi-select (numbered list from scanning
   `templates/modules/*/manifest.json`, filtered by detected stack) and audit level.
+  **All modules are always presented**: the menu is mandatory in interactive mode —
+  every available option is shown with its one-line description; the user selects any
+  subset (default: none). Stack-incompatible modules appear greyed/marked with a
+  warning and are skipped if selected.
 - New flags: `--modules=security-audit,project-scanner` and `--audit-level=basic|standard|strict`.
 - Default (no flags, no answers): core harness only — **byte-identical behavior to the
   current installer** except for the new `modules: []` and `audit_level: "basic"` keys
@@ -128,7 +151,8 @@ Following the existing `--tool` pattern (interactive prompt + non-interactive fl
 - Injection happens after the base template copy, before validation. Validation gains a
   per-module check from each manifest's `verify` list.
 - `--force`: refreshes module files and re-injects `append-section` content without
-  duplicating; preserves `harness/baselines.json` and `harness/decisions/` (user state).
+  duplicating; preserves `harness/baselines.json`, `harness/decisions/`,
+  `harness/wekan.json` (user state).
 
 ### 4.3 spec-author (architecture-catalog, decision-memory)
 
@@ -169,7 +193,8 @@ Following the existing `--tool` pattern (interactive prompt + non-interactive fl
 
 ### 4.6 Role templates (all modules)
 
-The behavior described in §4.3–§4.5 is written into the existing role templates —
+The behavior described in §4.3–§4.5 and §4.7 (role traces on Wekan cards) is written
+into the existing role templates —
 `templates/.claude/agents/{spec-author,reviewer,leader}.md` and
 `templates/.opencode/agent/{spec-author,reviewer,leader}.md` — as **conditional
 instructions** gated on the presence of the module's injected artifacts (e.g. "if
@@ -178,6 +203,59 @@ Decisions"). Agents without the module installed behave exactly as today; the
 conditions check file/config presence, so no template duplication is needed. Where a
 stack entry-point template (`templates/stacks/*/CLAUDE.md.tpl`, `templates/AGENTS.md`)
 lists doc files to consult, the module-conditional docs are added there too.
+
+### 4.7 wekan-tickets (external skill adaptation)
+
+Adapts the existing `wekan-tasks` opencode skill (self-hosted Wekan kanban, REST API
+via curl) into a harness module. When installed, **every workflow state transition is
+mirrored on the Wekan board** — the card is the ticket; the harness remains the source
+of truth, Wekan is the visible trace.
+
+**Board model:**
+- One board per project, titled with the project name from `feature_list.json`.
+- Created on first use if missing (idempotent), with **standard lists named after the
+  harness SDD states**: `pending`, `spec_ready`, `in_progress`, `blocked`, `done`.
+  Card position == feature status; moving a card between lists == state transition.
+  The list naming is overridable in `harness/wekan.json` (`"list_map": {...}`).
+
+**Card lifecycle and role traces:**
+
+| Event | Agent | Wekan action |
+|---|---|---|
+| Feature added / first seen at session start | leader | Create card (or find existing via `feature_list.json` card id); fill title + description (feature title, description, acceptance criteria) |
+| Spec written | spec-author | Move card → `spec_ready`; comment with spec path |
+| Human approves spec | leader | Move card → `in_progress` |
+| Implementation starts | implementer | Set `startAt` to today |
+| Task progresses / blocked | implementer | Comment with progress; if blocked move → `blocked` (and back when unblocked) |
+| Review verdict | reviewer | Comment with verdict; on approval move → `done` and set `endAt` to today |
+| Rework requested | reviewer | Move card back → `in_progress`; comment with findings |
+
+**Config and secrets:**
+- `harness/wekan.json` (committed, no secrets): `url`, `board_name` (default: project
+  name), `list_map`, `credentials_file` (path to the gitignored env file),
+  `enabled` (kill switch — agents skip Wekan actions when `false` or when the file is
+  absent).
+- Secrets stay outside the repo: `credentials_file` points to a gitignored env file
+  with `WEKAN_API_BEARER_TOKEN` / `WEKAN_API_USER_ID`, read via bash `sed` (never via
+  read tools; same pattern as the original skill).
+- If credentials or the server are unreachable, agents log the failure in
+  `progress/current.md` and continue — Wekan sync never blocks the SDD flow.
+
+**Traceability field:**
+- Each feature object in `feature_list.json` gains an optional `"wekan_card": "<id>"`
+  written by the leader when the card is created, so agents never re-search the board.
+
+**Adaptations from the original skill:**
+- Homelab-specific data removed: hardcoded `viatgecio` board/list/label IDs, Catalan
+  list names, fixed credential paths. Everything moves to `harness/wekan.json`.
+- Standard lists change from `backlog/Sprint/Fent-ho/Blocat/Fet/Enviat` to the harness
+  SDD states (1:1 mapping, overridable).
+- SKILL.md rewritten in English (repo convention) and restructured around the role
+  traces table above; the low-level API reference (auth quirks, `sed` token extraction,
+  `swimlaneId` requirement, error table, mongo board-lookup fallback) is preserved.
+- Delivered as a real skill for both tools: `.opencode/skill/wekan-tasks/` for opencode,
+  `.claude/skills/wekan-tasks/` for claude (per-tool `dst` in the manifest).
+- Stacks: all 7 (tool-agnostic HTTP).
 
 ## 5. Audit levels
 
@@ -264,7 +342,16 @@ Extend `tests/test-install.sh` (following its existing pattern):
    `harness/baselines.json` and `harness/decisions/` preserved.
 5. Module filtered by stack: selecting a module whose `stacks` excludes the detected
    stack produces a warning and skips injection, install still succeeds.
-6. Re-run `bash tests/test-install.sh` (existing tests) — no regressions.
+6. Install with `--tool=claude --modules=wekan-tickets`:
+   - `.claude/skills/wekan-tasks/SKILL.md` exists (and the `.opencode` path does NOT);
+   - `harness/wekan.json` exists, valid JSON, contains `url`, `list_map`,
+     `credentials_file`, `enabled` — and no secrets;
+   - `harness/wekan.json` is listed as preserved user state under `--force`.
+   Same assertions with `--tool=opencode` for `.opencode/skill/wekan-tasks/SKILL.md`.
+   No live Wekan API calls in tests — only file assertions.
+7. Interactive menu test (piped input): answering the module prompt lists all modules
+   with descriptions; selecting none yields the same result as case 2.
+8. Re-run `bash tests/test-install.sh` (existing tests) — no regressions.
 
 ## 9. Out of scope (v1)
 
@@ -272,3 +359,5 @@ Extend `tests/test-install.sh` (following its existing pattern):
   (`pending_arch_decision`, `auditing`).
 - JSON memory system, cross-stack scanners (v1 scanner: Python AST + generic file
   fallback), CI integration, multi-language scan.py.
+- Live Wekan integration testing (board creation, card moves) — the module ships the
+  skill and config; API behavior is inherited from the battle-tested original skill.
