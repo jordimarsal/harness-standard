@@ -50,7 +50,6 @@ class Scanner:
         self.root = root
         self.files: list[SourceFile] = []
         self._by_module: dict[str, SourceFile] = {}
-        self._by_class: dict[str, list[SourceFile]] = {}
         self._dependents: dict[str, set[str]] = {}
 
     def scan(self) -> None:
@@ -101,9 +100,6 @@ class Scanner:
                 current = self._by_module.get(key)
                 if current is None or len(parts) > len(current.module.split(".")):
                     self._by_module[key] = sf
-        for sf in self.files:
-            for name in sf.classes:
-                self._by_class.setdefault(name, []).append(sf)
         # Reverse-dependency index, built once — never per query.
         for sf in self.files:
             for imp in sf.imports:

@@ -181,7 +181,6 @@ else
   # Mandatory interactive menu (§4.2): every module is always presented.
   echo ""
   echo "Optional capability modules (none are installed by default):"
-  declare -A MENU_MAP=()
   menu_i=1
   for m in "${MODULES_AVAILABLE[@]:+${MODULES_AVAILABLE[@]}}"; do
     mf="$TEMPLATES_DIR/modules/$m/manifest.json"
@@ -286,6 +285,7 @@ inject_append_section() {  # inject_append_section <dst> <module-name> <src-file
   if grep -qF "$start" "$dst"; then
     # Replace only this module's own section (idempotent under --force).
     tmp="$(mktemp)"
+    chmod 644 "$tmp"
     awk -v start="$start" -v end="$end" -v src="$src" '
       BEGIN { while ((getline line < src) > 0) repl = repl line "\n" }
       index($0, start) { printf "%s\n%s", $0, repl; inblk = 1; next }
@@ -340,12 +340,12 @@ refresh_project_metadata() {  # refresh_project_metadata <feature-list>
   # line-scoped sed is safe; any other shape only warns.
   local fl="$1"
   if grep -q '"modules"[[:space:]]*:' "$fl"; then
-    sed -i "s|\"modules\"[[:space:]]*:[[:space:]]*\[[^]]*\]|\"modules\": [$MODULES_JSON]|" "$fl"
+    sed "s|\"modules\"[[:space:]]*:[[:space:]]*\[[^]]*\]|\"modules\": [$MODULES_JSON]|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
   else
     warn "Could not update 'modules' in $fl — set it manually in the project section."
   fi
   if grep -q '"audit_level"[[:space:]]*:' "$fl"; then
-    sed -i "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"audit_level\": \"$AUDIT_LEVEL\"|" "$fl"
+    sed "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"audit_level\": \"$AUDIT_LEVEL\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
   else
     warn "Could not update 'audit_level' in $fl — set it manually in the project section."
   fi

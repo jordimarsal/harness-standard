@@ -5,7 +5,7 @@
 # script. Without a baseline the script records values and warns (never blocks).
 #
 # Usage: bash harness/tools/bench.sh
-# Exit codes: 0 = ok or record-only, 1 = regression beyond critical threshold, 2 = usage error
+# Exit codes: 0 = ok or record-only, 1 = regression beyond critical threshold
 
 set -uo pipefail
 
