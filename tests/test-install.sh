@@ -513,6 +513,54 @@ test_modules_install_strict() {
   assert_grep "$t" '"audit_level": "strict"' "$d/harness/feature_list.json"
 }
 
+test_force_modules_replace_sections() {
+  local t="--force with modules replaces injected sections and preserves user state"
+  run_test "$t"
+  local d; d=$(new_project "force-modules")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=claude --modules=security-audit,performance-benchmarks --audit-level=standard >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: first install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # simulate user state created after install
+  echo '{"my_func": {"mean_ms": 12.5}}' > "$d/harness/baselines.json"
+  mkdir -p "$d/harness/decisions"
+  echo "# ADR-001" > "$d/harness/decisions/adr-001.md"
+  (cd "$d" && "$INIT" --force --tool=claude --modules=security-audit,performance-benchmarks --audit-level=standard >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: force install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # sections replaced, not duplicated
+  assert_count "$t" "harness:module:security-audit:start" "$d/docs/verification.md" 1
+  assert_count "$t" "harness:module:performance-benchmarks:start" "$d/docs/verification.md" 1
+  assert_count "$t" "harness:module:audit-checkpoint:start" "$d/harness/CHECKPOINTS.md" 1
+  # user state preserved
+  assert_grep "$t" '"my_func"' "$d/harness/baselines.json"
+  assert_file "$t" "$d/harness/decisions/adr-001.md"
+}
+
+test_force_switch_modules_metadata() {
+  local t="--force with a different module set refreshes feature_list metadata"
+  run_test "$t"
+  local d; d=$(new_project "force-switch-mods")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=opencode --modules=security-audit,performance-benchmarks --audit-level=strict >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: first install failed"); return
+  }
+  PASS=$((PASS + 1))
+  (cd "$d" && "$INIT" --force --tool=opencode --modules=architecture-catalog --audit-level=basic >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: force install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # metadata refreshed to the new selection
+  assert_grep "$t" '"architecture-catalog"' "$d/harness/feature_list.json"
+  assert_count "$t" '"performance-benchmarks"' "$d/harness/feature_list.json" 0
+  assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
+  # unselected append-section content is gone (base files re-copied clean, not re-injected)
+  assert_count "$t" "harness:module:security-audit:start" "$d/docs/verification.md" 0
+  assert_count "$t" "harness:module:audit-checkpoint:start" "$d/harness/CHECKPOINTS.md" 0
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -535,6 +583,8 @@ test_module_filtered_by_stack
 test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict
+test_force_modules_replace_sections
+test_force_switch_modules_metadata
 
 echo ""
 echo "────────────────────────────────────────"

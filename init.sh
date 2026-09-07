@@ -280,6 +280,23 @@ inject_module() {  # inject_module <module-name>
   done < <(manifest_injects "$mdir/manifest.json")
 }
 
+refresh_project_metadata() {  # refresh_project_metadata <feature-list>
+  # Best-effort: --force records the current run's module/audit selection.
+  # The target lines have the exact shape the installer itself writes, so a
+  # line-scoped sed is safe; any other shape only warns.
+  local fl="$1"
+  if grep -q '"modules"[[:space:]]*:' "$fl"; then
+    sed -i "s|\"modules\"[[:space:]]*:[[:space:]]*\[[^]]*\]|\"modules\": [$MODULES_JSON]|" "$fl"
+  else
+    warn "Could not update 'modules' in $fl — set it manually in the project section."
+  fi
+  if grep -q '"audit_level"[[:space:]]*:' "$fl"; then
+    sed -i "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"audit_level\": \"$AUDIT_LEVEL\"|" "$fl"
+  else
+    warn "Could not update 'audit_level' in $fl — set it manually in the project section."
+  fi
+}
+
 # ── Copy templates ─────────────────────────────────────
 info "Installing harness templates..."
 
@@ -310,19 +327,21 @@ cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
 [ -f "./harness/progress/current.md" ] || cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
 [ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
 
+MODULES_JSON=""
+if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
+  for m in "${MODULES_SELECTED[@]}"; do
+    MODULES_JSON="${MODULES_JSON:+$MODULES_JSON, }\"$m\""
+  done
+fi
+
 if [ ! -f "harness/feature_list.json" ]; then
-  MODULES_JSON=""
-  if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
-    for m in "${MODULES_SELECTED[@]}"; do
-      MODULES_JSON="${MODULES_JSON:+$MODULES_JSON, }\"$m\""
-    done
-  fi
   sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
       -e "s|{{MODULES}}|$MODULES_JSON|g" \
       -e "s|{{AUDIT_LEVEL}}|$AUDIT_LEVEL|g" \
       "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
 else
   ok "Keeping existing harness/feature_list.json"
+  refresh_project_metadata "harness/feature_list.json"
 fi
 
 # Verification script becomes harness/init.sh
