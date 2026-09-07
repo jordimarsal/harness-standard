@@ -1,0 +1,10 @@
+{
+  "name": "wekan-tickets",
+  "description": "Mirror every workflow state transition on a Wekan kanban board",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "SKILL.md", "dst": {"claude": ".claude/skills/wekan-tasks/SKILL.md", "opencode": ".opencode/skill/wekan-tasks/SKILL.md"}, "mode": "copy" },
+    { "src": "wekan.json", "dst": "harness/wekan.json", "mode": "copy-if-missing" }
+  ],
+  "verify": ["harness/wekan.json"]
+}

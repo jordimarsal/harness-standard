@@ -561,6 +561,51 @@ test_force_switch_modules_metadata() {
   assert_count "$t" "harness:module:audit-checkpoint:start" "$d/harness/CHECKPOINTS.md" 0
 }
 
+test_wekan_tickets_tool_dst() {
+  local t="wekan-tickets installs the skill for the chosen tool and preserves config"
+  run_test "$t"
+  # claude variant
+  local d; d=$(new_project "wekan-claude")
+  (cd "$d" && "$INIT" --tool=claude --modules=wekan-tickets >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: claude install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/.claude/skills/wekan-tasks/SKILL.md"
+  assert_no_file "$t" "$d/.opencode/skill/wekan-tasks/SKILL.md"
+  assert_file "$t" "$d/harness/wekan.json"
+  if python3 - "$d/harness/wekan.json" <<'PYEOF' >/dev/null 2>&1; then
+import json, sys
+raw = open(sys.argv[1]).read()
+data = json.loads(raw)
+for key in ("url", "list_map", "credentials_file", "enabled"):
+    assert key in data, f"missing key: {key}"
+assert "WEKAN_API_BEARER_TOKEN" not in raw, "secrets must not be in wekan.json"
+assert "WEKAN_API_USER_ID" not in raw, "secrets must not be in wekan.json"
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: wekan.json invalid or contains secrets")
+    echo "    FAIL: wekan.json invalid or contains secrets"
+  fi
+  # preserved as user state under --force
+  echo '{"custom": true}' > "$d/harness/wekan.json"
+  (cd "$d" && "$INIT" --force --tool=claude --modules=wekan-tickets >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: force install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" '"custom": true' "$d/harness/wekan.json"
+  assert_file "$t" "$d/.claude/skills/wekan-tasks/SKILL.md"
+  # opencode variant
+  local d2; d2=$(new_project "wekan-opencode")
+  (cd "$d2" && "$INIT" --tool=opencode --modules=wekan-tickets >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: opencode install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d2/.opencode/skill/wekan-tasks/SKILL.md"
+  assert_no_file "$t" "$d2/.claude/skills/wekan-tasks/SKILL.md"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -584,6 +629,7 @@ test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict
 test_force_modules_replace_sections
+test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
 
 echo ""
