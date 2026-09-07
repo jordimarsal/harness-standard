@@ -470,6 +470,29 @@ EOF
   fi
 }
 
+test_security_audit_module() {
+  local t="security-audit installs checklist, tool, C7; script degrades without tools"
+  run_test "$t"
+  local d; d=$(new_project "sec-audit")
+  (cd "$d" && "$INIT" --tool=claude --modules=security-audit --audit-level=standard >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_executable "$t" "$d/harness/tools/audit-security.sh"
+  assert_count "$t" "harness:module:security-audit:start" "$d/docs/verification.md" 1
+  assert_grep "$t" "Security Audit Checklist" "$d/docs/verification.md"
+  assert_grep "$t" "C7 — Audit" "$d/harness/CHECKPOINTS.md"
+  assert_count "$t" "harness:module:audit-checkpoint:start" "$d/harness/CHECKPOINTS.md" 1
+  # Generic project without tools: the script degrades to checklist-only, exit 0
+  if (cd "$d" && bash harness/tools/audit-security.sh > audit-report.txt 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: audit-security.sh non-zero on tool-less project")
+    echo "    FAIL: audit-security.sh should degrade to checklist-only with exit 0"
+  fi
+  assert_grep "$t" "Checklist" "$d/audit-report.txt"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -490,6 +513,7 @@ test_invalid_module_rejected
 test_invalid_audit_level_rejected
 test_module_filtered_by_stack
 test_project_scanner_module
+test_security_audit_module
 
 echo ""
 echo "────────────────────────────────────────"

@@ -1,0 +1,10 @@
+{
+  "name": "security-audit",
+  "description": "Security audit checklist plus SAST and dependency scan tool",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "verification-audit.md", "dst": "docs/verification.md", "mode": "append-section" },
+    { "src": "audit-security.sh", "dst": "harness/tools/audit-security.sh", "mode": "copy" }
+  ],
+  "verify": ["harness/tools/audit-security.sh"]
+}

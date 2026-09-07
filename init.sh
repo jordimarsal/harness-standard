@@ -366,6 +366,18 @@ if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
   for m in "${MODULES_SELECTED[@]}"; do
     inject_module "$m"
   done
+  C7_DONE=0
+  for m in "${MODULES_SELECTED[@]}"; do
+    case "$m" in
+      security-audit|performance-benchmarks)
+        if [ "$C7_DONE" -eq 0 ]; then
+          inject_append_section "./harness/CHECKPOINTS.md" "audit-checkpoint" \
+            "$TEMPLATES_DIR/modules/_shared/c7-audit.md"
+          C7_DONE=1
+        fi
+        ;;
+    esac
+  done
   info "Modules installed: ${MODULES_SELECTED[*]}"
 fi
 if [ "$AUDIT_LEVEL" != "basic" ]; then
