@@ -16,6 +16,19 @@ You are the leader agent. Your only job is to **decompose and coordinate** — n
 2. Read `harness/feature_list.json` and `harness/progress/current.md`.
 3. Run `harness/init.sh`. If it fails, stop and report.
 
+## Conditional capabilities (only when the module is installed)
+
+- **project-scanner** — if `harness/tools/scan.py` exists: in the Startup
+  Protocol, after `harness/init.sh` passes, run
+  `python3 harness/tools/scan.py --summary` and note the output summary in
+  `harness/progress/current.md`. After implementation, optionally re-run with
+  `--impact <changed-file>` for impact analysis of the touched files.
+- **wekan-tickets** — if `harness/wekan.json` exists and `"enabled"` is not
+  `false`: follow the installed `wekan-tasks` skill to mirror every state
+  transition on the board, and write the card id back as `"wekan_card": "<id>"`
+  on the feature object when you create a card. Wekan failures are logged in
+  `harness/progress/current.md` and never block the flow.
+
 ## SDD Workflow (Mandatory for ALL features)
 
 ```

@@ -24,6 +24,22 @@ You are a strict reviewer. Your only function is to **approve or reject** change
 7. Walk through `harness/CHECKPOINTS.md`. Mark `[x]` for met checkpoints, `[ ]` for unmet.
 8. Issue verdict.
 
+## Conditional audits (only when the module is installed)
+
+Read `"audit_level"` from the `project` section of `harness/feature_list.json`
+(absent or `basic` → no scripted audit):
+
+- **basic** — read the "Security Audit Checklist" section of `docs/verification.md`
+  and confirm each item manually; record the confirmation in the review file.
+- **standard** (when `harness/tools/audit-security.sh` exists) — run
+  `bash harness/tools/audit-security.sh` before the verdict, append the report to
+  `harness/progress/review_<name>.md`. Reject approval if it reports HIGH findings.
+- **strict** (additionally, when `harness/tools/bench.sh` exists) — run
+  `bash harness/tools/bench.sh`; reject if a benchmark regresses beyond the
+  critical threshold defined in `harness/baselines.json`.
+
+Checkpoint **C7** in `harness/CHECKPOINTS.md` (when present) reflects these rules.
+
 ## Verdict Format
 
 Your final output is **one block** written to `harness/progress/review_<name>.md`:

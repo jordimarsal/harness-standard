@@ -28,6 +28,14 @@
 | `.opencode/agent/`           | Subagent definitions (`leader`, `spec-author`, `implementer`, `reviewer`)   | If you orchestrate work          |
 | `src/`                      | Application code                                                            | To implement                     |
 | `tests/`                    | Automated tests                                                             | To verify                        |
+| `docs/architecture-options.md` | Architecture pattern catalog (module: architecture-catalog) | When filling design.md Architectural Decisions |
+| `docs/iteration-protocol.md`   | Adaptive iteration + adversarial review protocol (module: iterative-refinement) | During implementer refinement rounds |
+| `harness/tools/`               | Module tools: `audit-security.sh`, `bench.sh`, `scan.py` (if present) | On review (audits) or session start (scan) |
+| `harness/decisions/`           | ADRs worth remembering beyond a feature (if present) | Before proposing a new architectural decision |
+| `harness/wekan.json`           | Wekan ticket-mirror config (if present) | When syncing workflow state to the board |
+
+> Module files are conditional: if a file above exists, its module was installed —
+> follow it. If absent, ignore references to it.
 
 ## 3. Hard rules (non-negotiable)
 
