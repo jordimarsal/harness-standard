@@ -1,0 +1,9 @@
+{
+  "name": "iterative-refinement",
+  "description": "Adaptive iteration protocol with self-review and adversarial checklist",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "iteration-protocol.md", "dst": "docs/iteration-protocol.md", "mode": "copy" }
+  ],
+  "verify": ["docs/iteration-protocol.md"]
+}
