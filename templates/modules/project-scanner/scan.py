@@ -17,6 +17,7 @@ Exit codes: 0 ok, 2 usage error.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -188,7 +189,7 @@ def generic_summary(root: Path) -> str:
     return "\n".join(lines)
 
 
-def cmd_impact(sc: Scanner, target: str) -> str:
+def _find_file(sc: Scanner, target: str) -> SourceFile | None:
     path = Path(target)
     sf = next((f for f in sc.files if f.path == path), None)
     if sf is None and path.is_absolute():
@@ -198,6 +199,11 @@ def cmd_impact(sc: Scanner, target: str) -> str:
             rel = None
         if rel is not None:
             sf = next((f for f in sc.files if f.path == rel), None)
+    return sf
+
+
+def cmd_impact(sc: Scanner, target: str) -> str:
+    sf = _find_file(sc, target)
     if sf is None:
         return f"error: file not found in project: {target}"
     dependents = sorted(sc.affected_by(str(sf.path)))
@@ -236,16 +242,62 @@ def cmd_style(sc: Scanner, n: int) -> str:
     return "\n".join(lines)
 
 
+def json_summary(sc: Scanner) -> dict:
+    files = sc.files
+    test_files = [f for f in files if "test" in f.path.name or "test" in f.path.parent.name]
+    entry_points = [f for f in files if f.entry_point]
+    missing_docs = [f for f in files if f.classes and not f.docstring]
+    high = [f for f in files if sc.risk(f) == "HIGH"]
+    packages = sorted({str(f.path.parent) for f in files})
+    return {
+        "tool": "scan",
+        "protocol": 1,
+        "command": "summary",
+        "stack": "python" if files else "generic",
+        "files": sorted(str(f.path) for f in files),
+        "total_files": len(files),
+        "test_files": len(test_files),
+        "packages": len(packages),
+        "edges": sum(len(f.dependencies) for f in files),
+        "entry_points": [str(f.path) for f in entry_points],
+        "missing_docstrings": len(missing_docs),
+        "high_risk": [str(f.path) for f in high],
+        "duplicates": sc.find_duplicates(),
+    }
+
+
+def json_impact(sc: Scanner, target: str) -> dict:
+    sf = _find_file(sc, target)
+    if sf is None:
+        return {"tool": "scan", "protocol": 1, "command": "impact", "error": f"file not found in project: {target}"}
+    dependents = sorted(sc.affected_by(str(sf.path)))
+    tests = [d for d in dependents if "test" in d]
+    return {
+        "tool": "scan",
+        "protocol": 1,
+        "command": "impact",
+        "file": str(sf.path),
+        "dependencies": sorted(sf.dependencies),
+        "dependents": dependents,
+        "tests_affected": tests,
+        "impact_level": "HIGH" if dependents else "MEDIUM",
+        "change_risk": sc.risk(sf),
+    }
+
+
 def main(argv: list[str]) -> int:
     root = Path.cwd()
     style_n = 3
     command: str | None = None
     target: str | None = None
+    as_json = False
     i = 0
     while i < len(argv):
         a = argv[i]
         if a in ("--summary", "--duplicates"):
             command = a
+        elif a == "--json":
+            as_json = True
         elif a == "--impact":
             command = a
             i += 1
@@ -272,6 +324,19 @@ def main(argv: list[str]) -> int:
         command = "--summary"
     sc = Scanner(root)
     sc.scan()
+    if as_json:
+        if command == "--summary":
+            print(json.dumps(json_summary(sc)))
+        elif command == "--impact":
+            print(json.dumps(json_impact(sc, target or "")))
+        elif command == "--duplicates":
+            print(json.dumps({"tool": "scan", "protocol": 1, "command": "duplicates", "duplicates": sc.find_duplicates()}))
+        elif command == "--style":
+            print(json.dumps({"tool": "scan", "protocol": 1, "command": "style", "sample": [
+                {"path": str(sf.path), "classes": sf.classes, "regions": sf.regions, "first_imports": sf.imports[:3]}
+                for sf in [f for f in sc.files if "test" not in f.path.name][:style_n]
+            ]}))
+        return 0
     if command == "--summary":
         print(cmd_summary(sc))
     elif command == "--impact":

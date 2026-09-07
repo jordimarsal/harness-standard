@@ -622,6 +622,66 @@ PYEOF
   fi
 }
 
+test_scan_json_output() {
+  local t="scan.py --json emits protocol v1 for summary and impact"
+  run_test "$t"
+  local d; d=$(new_project "scan-json")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=opencode --modules=project-scanner >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  mkdir -p "$d/core"
+  cat > "$d/core/models.py" <<'EOF'
+"""Domain models."""
+
+
+class Order:
+    """An order aggregate."""
+EOF
+  cat > "$d/core/service.py" <<'EOF'
+"""Service layer."""
+from core.models import Order
+
+
+class OrderService:
+    pass
+EOF
+  (cd "$d" && python3 harness/tools/scan.py --json --summary > summary.json) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: scan.py --json --summary failed"); return
+  }
+  PASS=$((PASS + 1))
+  if python3 - "$d/summary.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["tool"] == "scan" and d["protocol"] == 1 and d["command"] == "summary"
+assert d["total_files"] == len(d["files"]) and "core/models.py" in d["files"]
+assert d["duplicates"] == {} and d["high_risk"] == []
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: summary.json invalid protocol-v1 shape")
+    echo "    FAIL: summary.json does not match protocol v1"
+  fi
+  (cd "$d" && python3 harness/tools/scan.py --json --impact core/service.py > impact.json) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: scan.py --json --impact failed"); return
+  }
+  PASS=$((PASS + 1))
+  if python3 - "$d/impact.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["command"] == "impact" and d["file"] == "core/service.py"
+assert "core/models.py" in d["dependencies"] and d["change_risk"] in ("HIGH", "MEDIUM", "LOW")
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: impact.json invalid protocol-v1 shape")
+    echo "    FAIL: impact.json does not match protocol v1"
+  fi
+}
+
 test_force_modules_replace_sections() {
   local t="--force with modules replaces injected sections and preserves user state"
   run_test "$t"
@@ -740,6 +800,7 @@ test_security_audit_module
 test_modules_install_strict
 test_audit_json_output
 test_bench_json_output
+test_scan_json_output
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
