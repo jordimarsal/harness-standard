@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Harness feature list (protocol v1)",
+  "type": "object",
+  "required": ["project", "features"],
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["name", "parallel", "modules", "audit_level"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "parallel": {"type": "boolean"},
+        "modules": {"type": "array", "items": {"type": "string"}},
+        "audit_level": {"enum": ["basic", "standard", "strict"]}
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "title", "description", "acceptance", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+          "title": {"type": "string"},
+          "description": {"type": "string"},
+          "acceptance": {"type": "array", "items": {"type": "string"}},
+          "status": {"enum": ["pending", "spec_ready", "in_progress", "blocked", "done"]},
+          "wekan_card": {"type": "string"}
+        }
+      }
+    }
+  }
+}

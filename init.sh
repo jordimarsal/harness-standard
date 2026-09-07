@@ -377,6 +377,9 @@ fi
 
 # Everything else groups under harness/
 mkdir -p harness/progress harness/specs
+mkdir -p harness/tools
+cp "$TEMPLATES_DIR/tools/validate-feature-list.py" ./harness/tools/
+chmod +x ./harness/tools/validate-feature-list.py
 cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
 [ -f "./harness/progress/current.md" ] || cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
 [ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
@@ -497,6 +500,13 @@ fi
 
 check_file "harness/CHECKPOINTS.md"
 check_file "harness/feature_list.json"
+if command -v python3 >/dev/null 2>&1; then
+  if python3 ./harness/tools/validate-feature-list.py ./harness/feature_list.json > /dev/null 2>&1; then
+    ok "feature_list.json is valid (protocol v1)"
+  else
+    warn "feature_list.json does not satisfy protocol v1 — run: python3 harness/tools/validate-feature-list.py harness/feature_list.json"
+  fi
+fi
 check_file "harness/init.sh"
 check_file "harness/progress/current.md"
 check_file "harness/progress/history.md"

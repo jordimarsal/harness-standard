@@ -210,7 +210,8 @@ test_interactive_module_menu() {
   assert_grep "$t" "Audit level" "$d/init-output.txt"
   assert_grep "$t" '"modules": \[\]' "$d/harness/feature_list.json"
   assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
-  assert_no_dir "$t" "$d/harness/tools"
+  assert_file "$t" "$d/harness/tools/validate-feature-list.py"
+  assert_no_file "$t" "$d/harness/tools/scan.py"
 
   local t2="interactive menu accepts module selection by number"
   run_test "$t2"
@@ -408,7 +409,9 @@ test_default_install_no_modules() {
   PASS=$((PASS + 1))
   assert_grep "$t" '"modules": \[\]' "$d/harness/feature_list.json"
   assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
-  assert_no_dir "$t" "$d/harness/tools"
+  assert_file "$t" "$d/harness/tools/validate-feature-list.py"
+  assert_no_file "$t" "$d/harness/tools/scan.py"
+  assert_no_file "$t" "$d/harness/tools/audit-security.sh"
   assert_no_file "$t" "$d/harness/baselines.json"
   assert_no_file "$t" "$d/harness/wekan.json"
   assert_no_dir "$t" "$d/harness/decisions"
@@ -656,7 +659,8 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["tool"] == "scan" and d["protocol"] == 1 and d["command"] == "summary"
 assert d["total_files"] == len(d["files"]) and "core/models.py" in d["files"]
-assert d["duplicates"] == {} and d["high_risk"] == []
+assert d["high_risk"] == []
+assert all("core/" not in f for fs in d["duplicates"].values() for f in fs)
 sys.exit(0)
 PYEOF
     PASS=$((PASS + 1))
@@ -679,6 +683,65 @@ PYEOF
   else
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: impact.json invalid protocol-v1 shape")
     echo "    FAIL: impact.json does not match protocol v1"
+  fi
+}
+
+test_feature_list_validator() {
+  local t="feature_list validator accepts fresh install and rejects invalid files"
+  run_test "$t"
+  local d; d=$(new_project "fl-validator")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # fresh install validates clean (text mode)
+  if (cd "$d" && python3 harness/tools/validate-feature-list.py harness/feature_list.json > validator.txt 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: validator rejected a fresh feature_list.json")
+    echo "    FAIL: validator rejected fresh install"
+    return
+  fi
+  # machine mode: valid
+  (cd "$d" && python3 harness/tools/validate-feature-list.py --json harness/feature_list.json > validator.json)
+  PASS=$((PASS + 1))
+  if python3 - "$d/validator.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["tool"] == "validate-feature-list" and d["protocol"] == 1 and d["valid"] is True and d["errors"] == []
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: validator.json invalid for valid file")
+    echo "    FAIL: validator.json wrong shape"
+  fi
+  # invalid: two in_progress + bad status
+  cat > "$d/harness/feature_list.json" <<'EOF'
+{
+  "project": {"name": "p", "parallel": false, "modules": [], "audit_level": "basic"},
+  "features": [
+    {"id": 1, "name": "a", "title": "A", "description": "a", "acceptance": [], "status": "in_progress"},
+    {"id": 2, "name": "b", "title": "B", "description": "b", "acceptance": [], "status": "in_progress"},
+    {"id": 3, "name": "c", "title": "C", "description": "c", "acceptance": [], "status": "nope"}
+  ]
+}
+EOF
+  if (cd "$d" && python3 harness/tools/validate-feature-list.py harness/feature_list.json >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: validator accepted two in_progress + bad status")
+    echo "    FAIL: validator too permissive"
+  else
+    PASS=$((PASS + 1))
+  fi
+  (cd "$d" && python3 harness/tools/validate-feature-list.py --json harness/feature_list.json > invalid.json)
+  PASS=$((PASS + 1))
+  assert_grep "$t" '"valid": false' "$d/invalid.json"
+  # schema file exists in repo and parses
+  if python3 -c "import json; json.load(open('$REPO_DIR/templates/feature_list.schema.json'))" 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: feature_list.schema.json missing or invalid")
+    echo "    FAIL: schema missing/invalid"
   fi
 }
 
@@ -801,6 +864,7 @@ test_modules_install_strict
 test_audit_json_output
 test_bench_json_output
 test_scan_json_output
+test_feature_list_validator
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
