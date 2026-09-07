@@ -554,6 +554,45 @@ test_modules_install_strict() {
   assert_grep "$t" '"audit_level": "strict"' "$d/harness/feature_list.json"
 }
 
+test_audit_json_output() {
+  local t="audit-security.sh --json emits protocol v1 (generic checklist-only)"
+  run_test "$t"
+  local d; d=$(new_project "audit-json")
+  (cd "$d" && "$INIT" --tool=opencode --modules=security-audit >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  if (cd "$d" && bash harness/tools/audit-security.sh --json > audit.json 2>/dev/null); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --json exited non-zero"); return
+  fi
+  if python3 - "$d/audit.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["tool"] == "audit-security" and d["protocol"] == 1
+assert d["stack"] == "generic" and d["mode"] == "checklist-only"
+assert d["verdict"] == "PASS" and d["findings"] == [] and isinstance(d["skipped"], list)
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: audit.json invalid protocol-v1 shape")
+    echo "    FAIL: audit.json does not match protocol v1"
+  fi
+  # text mode remains default and unchanged
+  (cd "$d" && bash harness/tools/audit-security.sh > audit.txt 2>/dev/null)
+  PASS=$((PASS + 1))
+  assert_grep "$t" "Security Audit Report" "$d/audit.txt"
+  # unknown argument exits 2
+  if (cd "$d" && bash harness/tools/audit-security.sh --bogus >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --bogus should exit 2")
+    echo "    FAIL: audit-security.sh accepted --bogus"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
 test_force_modules_replace_sections() {
   local t="--force with modules replaces injected sections and preserves user state"
   run_test "$t"
@@ -670,6 +709,7 @@ test_module_filtered_by_stack
 test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict
+test_audit_json_output
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
