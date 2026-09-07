@@ -282,6 +282,46 @@ test_force_switch_tool() {
   assert_harness_layout "$t" "$d"
 }
 
+test_module_manifests_valid() {
+  local t="every module manifest parses and its referenced files exist"
+  run_test "$t"
+  if [ ! -d "$REPO_DIR/templates/modules" ]; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: templates/modules missing")
+    echo "    FAIL: templates/modules does not exist"
+    return
+  fi
+  local n=0
+  for mf in "$REPO_DIR"/templates/modules/*/manifest.json; do
+    [ -e "$mf" ] || continue
+    n=$((n + 1))
+    if python3 - "$mf" "$(dirname "$mf")" <<'PYEOF' >/dev/null 2>&1; then
+import json, os, sys
+mf, mdir = sys.argv[1], sys.argv[2]
+data = json.load(open(mf))
+required = {"name", "description", "stacks", "injects", "verify"}
+missing = required - set(data)
+assert not missing, f"missing keys: {missing}"
+assert isinstance(data["stacks"], list) and data["stacks"], "stacks must be a non-empty list"
+for inj in data["injects"]:
+    assert {"src", "dst", "mode"} <= set(inj), f"bad inject: {inj}"
+    assert os.path.isfile(os.path.join(mdir, inj["src"])), f"missing src file: {inj['src']}"
+for v in data["verify"]:
+    assert isinstance(v, str)
+    assert not v.startswith("/"), f"verify path must be project-relative: {v}"
+sys.exit(0)
+PYEOF
+      PASS=$((PASS + 1))
+    else
+      FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: invalid manifest $mf")
+      echo "    FAIL: invalid manifest: $mf"
+    fi
+  done
+  if [ "$n" -eq 0 ]; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: no module manifests found")
+    echo "    FAIL: no module manifests found"
+  fi
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -295,6 +335,7 @@ test_force_reinstall_preserves_state
 test_force_switch_tool
 test_verify_script_runs
 test_python_stack
+test_module_manifests_valid
 
 echo ""
 echo "────────────────────────────────────────"
