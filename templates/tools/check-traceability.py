@@ -8,6 +8,9 @@ harness/progress/impl_*.md, and verifies:
   2. every test identifier referenced by a row exists literally under tests/
      (file name or file content match).
 
+Per Protocol §5, requirements whose table Status is not "done" are reported
+as unresolved (they do not create gaps).
+
 Usage:
   check-traceability.py --all [--json] [root]
   check-traceability.py --feature NAME [--json] [root]
@@ -23,7 +26,7 @@ import sys
 from pathlib import Path
 
 REQ_RE = re.compile(r"\bR(\d+)\b")
-ROW_RE = re.compile(r"^\|\s*(R\d+)\s*\|([^|]*)\|")
+ROW_RE = re.compile(r"^\|\s*(R\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|")
 
 
 def find_requirements(root: Path, feature: str) -> set[str]:
@@ -33,12 +36,13 @@ def find_requirements(root: Path, feature: str) -> set[str]:
     return {f"R{m}" for m in REQ_RE.findall(req_file.read_text(encoding="utf-8"))}
 
 
-def collect_tables(root: Path) -> dict[str, dict[str, list[str]]]:
-    """Merge every impl_*.md table into {requirement: [test identifiers]}."""
+def collect_tables(root: Path) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """Merge every impl_*.md table into {requirement: [test identifiers]} plus status."""
     merged: dict[str, list[str]] = {}
+    statuses: dict[str, str] = {}
     progress = root / "harness" / "progress"
     if not progress.is_dir():
-        return merged
+        return merged, statuses
     for impl in sorted(progress.glob("impl_*.md")):
         for line in impl.read_text(encoding="utf-8").splitlines():
             m = ROW_RE.match(line)
@@ -46,11 +50,13 @@ def collect_tables(root: Path) -> dict[str, dict[str, list[str]]]:
                 continue
             req = m.group(1)
             tests = [t for t in re.split(r"[,\s]+", m.group(2).strip()) if t]
+            # first-seen row wins if a requirement appears in multiple tables
+            statuses.setdefault(req, m.group(4).strip())
             merged.setdefault(req, [])
             for t in tests:
                 if t not in merged[req]:
                     merged[req].append(t)
-    return merged
+    return merged, statuses
 
 
 def test_identifier_exists(root: Path, identifier: str) -> bool:
@@ -58,16 +64,15 @@ def test_identifier_exists(root: Path, identifier: str) -> bool:
     if not tests_dir.is_dir():
         return False
     for tf in tests_dir.rglob("*.py"):
-        if identifier in tf.name or identifier in tf.read_text(encoding="utf-8"):
+        if identifier in tf.name or identifier in tf.read_text(encoding="utf-8", errors="replace"):
             return True
     return False
 
 
 def check_feature(root: Path, feature: str) -> dict:
     requirements = find_requirements(root, feature)
-    tables = collect_tables(root)
+    tables, statuses = collect_tables(root)
     gaps: list[dict[str, str]] = []
-    unresolved: list[str] = []
     covered = 0
     for req in sorted(requirements, key=lambda r: int(r[1:])):
         tests = tables.get(req)
@@ -79,9 +84,12 @@ def check_feature(root: Path, feature: str) -> dict:
             gaps.append({"requirement": req, "reason": f"test identifier(s) not found under tests/: {', '.join(missing)}"})
             continue
         covered += 1
-    for req, tests in sorted(tables.items()):
-        if requirements and req not in requirements:
-            unresolved.append(req)
+    # protocol §5: unresolved = requirements whose table Status is not "done"
+    unresolved = [
+        req
+        for req in sorted(requirements, key=lambda r: int(r[1:]))
+        if req in statuses and statuses[req] != "done"
+    ]
     return {
         "name": feature,
         "requirements": len(requirements),

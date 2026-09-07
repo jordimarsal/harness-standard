@@ -836,6 +836,32 @@ EOF
   else
     PASS=$((PASS + 1))
   fi
+  # unresolved semantics: covered row with status != done -> no gap, but unresolved
+  cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+| Requirement | Test(s)          | Implementation file(s) | Status |
+|-------------|------------------|------------------------|--------|
+| R1          | test_empty_cart  | src/core/cart.py       | done   |
+| R2          | test_persist     | src/core/orders.py     | wip    |
+EOF
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > trace3.json); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: wip status row must not fail coverage")
+    echo "    FAIL: wip status must not create a gap"
+  fi
+  if python3 - "$d/trace3.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+feat = d["features"][0]
+assert feat["gaps"] == [], feat["gaps"]
+assert feat["unresolved"] == ["R2"], feat["unresolved"]
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: unresolved must be [\"R2\"] for wip row")
+    echo "    FAIL: unresolved wrong shape"
+  fi
 }
 
 test_force_modules_replace_sections() {
