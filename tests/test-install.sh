@@ -745,6 +745,99 @@ EOF
   fi
 }
 
+test_traceability_checker() {
+  local t="traceability checker passes full coverage and flags missing R"
+  run_test "$t"
+  local d; d=$(new_project "trace-check")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # fixture feature: requirements R1 R2, impl table covers only R1
+  mkdir -p "$d/harness/specs/feat-a" "$d/tests"
+  cat > "$d/harness/specs/feat-a/requirements.md" <<'EOF'
+# Requirements — feat-a
+
+- R1: WHEN the user submits an empty cart, the system SHALL show an error.
+- R2: The system SHALL persist the order.
+EOF
+  cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+# Implementation — feat-a
+
+| Requirement | Test(s)            | Implementation file(s) | Status |
+|-------------|--------------------|------------------------|--------|
+| R1          | test_empty_cart    | src/core/cart.py       | done   |
+EOF
+  cat > "$d/tests/test_cart.py" <<'EOF'
+def test_empty_cart():
+    assert True
+EOF
+  if [ ! -f "$d/harness/tools/check-traceability.py" ]; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: checker not installed")
+    echo "    FAIL: harness/tools/check-traceability.py missing"
+    return
+  fi
+  PASS=$((PASS + 1))
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a > trace.txt 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: checker passed with R2 missing")
+    echo "    FAIL: R2 gap not detected"
+  else
+    PASS=$((PASS + 1))
+  fi
+  assert_grep "$t" "R2" "$d/trace.txt"
+  (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > trace.json)
+  PASS=$((PASS + 1))
+  if python3 - "$d/trace.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["tool"] == "check-traceability" and d["protocol"] == 1 and d["verdict"] == "FAIL"
+feat = d["features"][0]
+assert feat["name"] == "feat-a" and feat["requirements"] == 2 and feat["covered"] == 1
+assert any(g["requirement"] == "R2" for g in feat["gaps"])
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: trace.json invalid shape")
+    echo "    FAIL: trace.json wrong shape"
+  fi
+  # fix the table -> PASS (exit 0)
+  cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+# Implementation — feat-a
+
+| Requirement | Test(s)                      | Implementation file(s) | Status |
+|-------------|------------------------------|------------------------|--------|
+| R1          | test_empty_cart              | src/core/cart.py       | done   |
+| R2          | test_empty_cart, test_persist| src/core/orders.py     | done   |
+EOF
+  cat >> "$d/tests/test_cart.py" <<'EOF'
+
+
+def test_persist():
+    assert True
+EOF
+  if (cd "$d" && python3 harness/tools/check-traceability.py --all --json > trace2.json 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: checker failed after coverage completed")
+    echo "    FAIL: complete coverage must pass"
+  fi
+  assert_grep "$t" '"verdict": "PASS"' "$d/trace2.json"
+  # ghost test identifier must fail
+  cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+| Requirement | Test(s)          | Implementation file(s) | Status |
+|-------------|------------------|------------------------|--------|
+| R1          | test_ghost       | src/core/cart.py       | done   |
+| R2          | test_persist     | src/core/orders.py     | done   |
+EOF
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: checker accepted ghost test identifier")
+    echo "    FAIL: ghost test not detected"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
 test_force_modules_replace_sections() {
   local t="--force with modules replaces injected sections and preserves user state"
   run_test "$t"
@@ -865,6 +958,7 @@ test_audit_json_output
 test_bench_json_output
 test_scan_json_output
 test_feature_list_validator
+test_traceability_checker
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata

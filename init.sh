@@ -380,6 +380,8 @@ mkdir -p harness/progress harness/specs
 mkdir -p harness/tools
 cp "$TEMPLATES_DIR/tools/validate-feature-list.py" ./harness/tools/
 chmod +x ./harness/tools/validate-feature-list.py
+cp "$TEMPLATES_DIR/tools/check-traceability.py" ./harness/tools/
+chmod +x ./harness/tools/check-traceability.py
 cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
 [ -f "./harness/progress/current.md" ] || cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
 [ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
