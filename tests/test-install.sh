@@ -194,6 +194,47 @@ test_invalid_tool_rejected() {
   fi
 }
 
+test_interactive_module_menu() {
+  local t="interactive menu lists every module; empty answers install none"
+  run_test "$t"
+  local d; d=$(new_project "interactive-menu")
+  local out
+  out="$(cd "$d" && printf 'o\n\n\n' | "$INIT" 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  for m in architecture-catalog iterative-refinement decision-memory project-scanner security-audit performance-benchmarks wekan-tickets; do
+    assert_grep "$t" "$m" "$d/init-output.txt"
+  done
+  assert_grep "$t" "Audit level" "$d/init-output.txt"
+  assert_grep "$t" '"modules": \[\]' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
+  assert_no_dir "$t" "$d/harness/tools"
+
+  local t2="interactive menu accepts module selection by number"
+  run_test "$t2"
+  d=$(new_project "interactive-select")
+  # menu order is the alphabetical module dir order; 1 = architecture-catalog
+  out="$(cd "$d" && printf 'o\n1,99\n\n' | "$INIT" 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_file "$t2" "$d/docs/architecture-options.md"
+  assert_grep "$t2" '"architecture-catalog"' "$d/harness/feature_list.json"
+  assert_grep "$t2" "Ignoring invalid module number" "$d/init-output.txt"
+
+  local t3="interactive audit level prompt accepts standard"
+  run_test "$t3"
+  d=$(new_project "interactive-audit")
+  (cd "$d" && printf 'o\n\n2\n' | "$INIT" >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t3: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t3" '"audit_level": "standard"' "$d/harness/feature_list.json"
+}
+
 test_reinstall_refused() {
   local t="reinstall is refused when harness exists"
   run_test "$t"
@@ -614,6 +655,7 @@ test_claude_mode_typescript
 test_opencode_mode_generic
 test_interactive_prompt
 test_invalid_tool_rejected
+test_interactive_module_menu
 test_reinstall_refused
 test_force_reinstall_preserves_state
 test_force_switch_tool

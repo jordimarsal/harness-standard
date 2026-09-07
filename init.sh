@@ -177,8 +177,62 @@ if [ -n "$MODULES_FLAG" ]; then
       warn "Module '$m' does not support stack '$STACK' — skipped."
     fi
   done
+else
+  # Mandatory interactive menu (§4.2): every module is always presented.
+  echo ""
+  echo "Optional capability modules (none are installed by default):"
+  declare -A MENU_MAP=()
+  menu_i=1
+  for m in "${MODULES_AVAILABLE[@]:+${MODULES_AVAILABLE[@]}}"; do
+    mf="$TEMPLATES_DIR/modules/$m/manifest.json"
+    desc="$(manifest_str "$mf" "description")"
+    if module_supports_stack "$m" "$STACK"; then
+      mark=""
+    else
+      mark="  [incompatible with stack: $STACK — will be skipped]"
+    fi
+    printf "  %d) %-24s %s%s\n" "$menu_i" "$m" "$desc" "$mark"
+    MENU_MAP[$menu_i]="$m"
+    menu_i=$((menu_i + 1))
+  done
+  printf "Select modules to install (comma-separated numbers, Enter = none): "
+  read -r answer || answer=""
+  if [ -n "$answer" ]; then
+    IFS=',' read -ra nums <<< "$answer"
+    for n in "${nums[@]}"; do
+      n="$(printf '%s' "$n" | tr -d '[:space:]')"
+      if [ -z "$n" ]; then continue; fi
+      m="${MENU_MAP[$n]:-}"
+      if [ -z "$m" ]; then
+        warn "Ignoring invalid module number: $n"
+      elif module_supports_stack "$m" "$STACK"; then
+        MODULES_SELECTED+=("$m")
+      else
+        warn "Module '$m' does not support stack '$STACK' — skipped."
+      fi
+    done
+  fi
 fi
-# (the interactive module menu is added by a later task)
+
+# Audit level prompt (skipped when --audit-level was given).
+if [ -z "$AUDIT_LEVEL" ]; then
+  echo ""
+  echo "Audit level applied by the reviewer (when audit modules are installed):"
+  echo "  1) basic    — checklist-only review (default)"
+  echo "  2) standard — run harness/tools/audit-security.sh on every review"
+  echo "  3) strict   — standard + benchmark comparison vs harness/baselines.json"
+  printf "Choice [1/2/3, Enter = basic]: "
+  read -r answer || answer=""
+  case "$answer" in
+    ""|1|basic) AUDIT_LEVEL="basic" ;;
+    2|standard) AUDIT_LEVEL="standard" ;;
+    3|strict)   AUDIT_LEVEL="strict" ;;
+    *)
+      warn "Invalid audit level '$answer'; using 'basic'."
+      AUDIT_LEVEL="basic"
+      ;;
+  esac
+fi
 
 AUDIT_LEVEL="${AUDIT_LEVEL:-basic}"
 
