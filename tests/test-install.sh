@@ -399,6 +399,77 @@ test_invalid_audit_level_rejected() {
   fi
 }
 
+test_module_filtered_by_stack() {
+  local t="stack-incompatible module is skipped with a warning"
+  run_test "$t"
+  local d; d=$(new_project "stack-filter")
+  local out
+  out="$(cd "$d" && "$INIT" --tool=claude --modules=project-scanner 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_grep "$t" "does not support stack" "$d/init-output.txt"
+  assert_no_file "$t" "$d/harness/tools/scan.py"
+  if grep -q '"project-scanner"' "$d/harness/feature_list.json"; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: skipped module recorded in feature_list.json")
+    echo "    FAIL: skipped module recorded in feature_list.json"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
+test_project_scanner_module() {
+  local t="project-scanner installs on python stack and scan.py answers queries"
+  run_test "$t"
+  local d; d=$(new_project "scanner")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=opencode --modules=project-scanner >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/harness/tools/scan.py"
+  # Fixture project code
+  mkdir -p "$d/core"
+  cat > "$d/core/models.py" <<'EOF'
+"""Domain models."""
+
+
+class Order:
+    """An order aggregate."""
+
+
+def create_order():
+    return Order()
+EOF
+  cat > "$d/core/service.py" <<'EOF'
+"""Service layer."""
+from core.models import Order
+
+
+class OrderService:
+    pass
+EOF
+  (cd "$d" && python3 harness/tools/scan.py --summary > summary.txt) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: scan.py --summary failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "core/models.py" "$d/summary.txt"
+  assert_grep "$t" "core/service.py" "$d/summary.txt"
+  (cd "$d" && python3 harness/tools/scan.py --impact core/service.py > impact.txt) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: scan.py --impact failed"); return
+  }
+  PASS=$((PASS + 1))
+  # service.py depends on models.py — proves module-name resolution works
+  assert_grep "$t" "core/models.py" "$d/impact.txt"
+  if (cd "$d" && python3 harness/tools/scan.py --duplicates > dupes.txt); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: scan.py --duplicates failed")
+    echo "    FAIL: scan.py --duplicates exited non-zero"
+  fi
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -417,6 +488,8 @@ test_modules_install
 test_default_install_no_modules
 test_invalid_module_rejected
 test_invalid_audit_level_rejected
+test_module_filtered_by_stack
+test_project_scanner_module
 
 echo ""
 echo "────────────────────────────────────────"
