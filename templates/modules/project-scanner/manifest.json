@@ -1,0 +1,9 @@
+{
+  "name": "project-scanner",
+  "description": "Deterministic Python project scanner for impact analysis",
+  "stacks": ["python"],
+  "injects": [
+    { "src": "scan.py", "dst": "harness/tools/scan.py", "mode": "copy" }
+  ],
+  "verify": ["harness/tools/scan.py"]
+}

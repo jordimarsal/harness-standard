@@ -1,0 +1,11 @@
+{
+  "name": "performance-benchmarks",
+  "description": "Benchmark verification rules and a stack-aware bench runner",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "verification-benchmarks.md", "dst": "docs/verification.md", "mode": "append-section" },
+    { "src": "bench.sh", "dst": "harness/tools/bench.sh", "mode": "copy" },
+    { "src": "baselines.json", "dst": "harness/baselines.json", "mode": "copy-if-missing" }
+  ],
+  "verify": ["harness/tools/bench.sh"]
+}

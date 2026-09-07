@@ -110,6 +110,9 @@ Every module directory contains `manifest.json` with exactly these keys:
   Multiple modules may append to the same file; each section is independent.
   `--force` replaces only the content between that module's own markers, never another
   module's section.
+- `mode: "copy-if-missing"` — copy only when the destination does not exist yet; used
+  for user-state files (`harness/baselines.json`, `harness/wekan.json`,
+  `harness/decisions/_template.md`) so reinstalls never overwrite them.
 - `verify`: paths that must exist after installation for the module to count as valid.
 - `dst` may be a plain path or an object keyed by tool for tool-dependent destinations:
   `{"claude": ".claude/skills/wekan-tasks/SKILL.md", "opencode": ".opencode/skill/wekan-tasks/SKILL.md"}`.

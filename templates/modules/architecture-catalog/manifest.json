@@ -1,0 +1,9 @@
+{
+  "name": "architecture-catalog",
+  "description": "Reference catalog of architecture options for design decisions",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "architecture-options.md", "dst": "docs/architecture-options.md", "mode": "copy" }
+  ],
+  "verify": ["docs/architecture-options.md"]
+}
