@@ -593,6 +593,35 @@ PYEOF
   fi
 }
 
+test_bench_json_output() {
+  local t="bench.sh --json emits protocol v1 (record-only without framework)"
+  run_test "$t"
+  local d; d=$(new_project "bench-json")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=opencode --modules=performance-benchmarks >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  if (cd "$d" && bash harness/tools/bench.sh --json > bench.json 2>/dev/null); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --json exited non-zero"); return
+  fi
+  if python3 - "$d/bench.json" <<'PYEOF' 2>/dev/null; then
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["tool"] == "bench" and d["protocol"] == 1
+assert d["stack"] == "python" and d["mode"] in ("run", "record-only")
+assert d["results"] == [] and d["regressions"] == [] and d["verdict"] == "PASS"
+sys.exit(0)
+PYEOF
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: bench.json invalid protocol-v1 shape")
+    echo "    FAIL: bench.json does not match protocol v1"
+  fi
+}
+
 test_force_modules_replace_sections() {
   local t="--force with modules replaces injected sections and preserves user state"
   run_test "$t"
@@ -710,6 +739,7 @@ test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict
 test_audit_json_output
+test_bench_json_output
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
