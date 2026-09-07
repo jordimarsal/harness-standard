@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--force]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -39,21 +39,35 @@ if [ ! -d "$TEMPLATES_DIR" ]; then
   exit 1
 fi
 
-# ── Tool selection (claude / opencode) ─────────────────
+# ── Tool / modules / audit-level selection ─────────────
 TOOL=""
 FORCE=0
+MODULES_FLAG=""
+AUDIT_LEVEL=""
 for arg in "$@"; do
   case "$arg" in
     --tool=claude)   TOOL="claude" ;;
     --tool=opencode) TOOL="opencode" ;;
     --force) FORCE=1 ;;
+    --modules=*)     MODULES_FLAG="${arg#--modules=}" ;;
+    --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode] [--force]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force]"
       exit 1
       ;;
   esac
 done
+
+if [ -n "$AUDIT_LEVEL" ]; then
+  case "$AUDIT_LEVEL" in
+    basic|standard|strict) ;;
+    *)
+      fail "Invalid --audit-level value: $AUDIT_LEVEL (use basic|standard|strict)"
+      exit 1
+      ;;
+  esac
+fi
 
 if [ -z "$TOOL" ]; then
   echo ""
@@ -117,6 +131,57 @@ detect_stack() {
 STACK=$(detect_stack)
 info "Detected stack: $STACK"
 
+# ── Module manifest helpers (pure sed/grep; manifests follow a strict format) ──
+manifest_str() {  # manifest_str <manifest> <key> — value of a "key": "value" line
+  sed -n "s/^[[:space:]]*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -n 1
+}
+
+manifest_list() {  # manifest_list <manifest> <key> — items of a one-line string array
+  { grep -E "^[[:space:]]*\"$2\"" "$1" || true; } \
+    | { grep -o '"[^"]*"' || true; } \
+    | { grep -vx "\"$2\"" || true; } \
+    | sed 's/^"//; s/"$//'
+}
+
+manifest_injects() {  # manifest_injects <manifest> — one inject entry per line
+  grep -E '^[[:space:]]*\{[[:space:]]*"src"' "$1" || true
+}
+
+module_supports_stack() {  # module_supports_stack <module> <stack> → exit 0 if supported
+  { grep -E "^[[:space:]]*\"stacks\"" "$TEMPLATES_DIR/modules/$1/manifest.json" || true; } \
+    | grep -q "\"$2\""
+}
+
+# ── Optional capability modules ────────────────────────
+MODULES_SELECTED=()
+
+MODULES_AVAILABLE=()
+for mdir in "$TEMPLATES_DIR/modules"/*/; do
+  [ -f "$mdir/manifest.json" ] || continue
+  MODULES_AVAILABLE+=("$(basename "$mdir")")
+done
+
+if [ -n "$MODULES_FLAG" ]; then
+  IFS=',' read -ra requested <<< "$MODULES_FLAG"
+  for m in "${requested[@]}"; do
+    m="$(printf '%s' "$m" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    if [ -z "$m" ]; then continue; fi
+    if [ ! -f "$TEMPLATES_DIR/modules/$m/manifest.json" ]; then
+      fail "Unknown module: $m"
+      fail "Available: ${MODULES_AVAILABLE[*]:-none}"
+      exit 1
+    fi
+    if module_supports_stack "$m" "$STACK"; then
+      MODULES_SELECTED+=("$m")
+    else
+      warn "Module '$m' does not support stack '$STACK' — skipped."
+    fi
+  done
+fi
+# (the interactive module menu is added by a later task)
+
+AUDIT_LEVEL="${AUDIT_LEVEL:-basic}"
+
 # ── Stack-specific variables ───────────────────────────
 case "$STACK" in
   typescript)
@@ -156,6 +221,65 @@ esac
 
 PROJECT_NAME="$(basename "$(pwd)")"
 
+# ── Module injection ───────────────────────────────────
+inject_append_section() {  # inject_append_section <dst> <module-name> <src-file>
+  local dst="$1" name="$2" src="$3"
+  local start end tmp
+  start="<!-- harness:module:$name:start -->"
+  end="<!-- harness:module:$name:end -->"
+  mkdir -p "$(dirname "$dst")"
+  if [ ! -f "$dst" ]; then : > "$dst"; fi
+  if grep -qF "$start" "$dst"; then
+    # Replace only this module's own section (idempotent under --force).
+    tmp="$(mktemp)"
+    awk -v start="$start" -v end="$end" -v src="$src" '
+      BEGIN { while ((getline line < src) > 0) repl = repl line "\n" }
+      index($0, start) { printf "%s\n%s", $0, repl; inblk = 1; next }
+      inblk && index($0, end) { inblk = 0 }
+      !inblk { print }
+    ' "$dst" > "$tmp" && mv "$tmp" "$dst"
+  else
+    { printf '\n'; printf '%s\n' "$start"; cat "$src"; printf '%s\n' "$end"; } >> "$dst"
+  fi
+}
+
+inject_module() {  # inject_module <module-name>
+  local m="$1"
+  local mdir="$TEMPLATES_DIR/modules/$m"
+  local line src dst mode
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then continue; fi
+    src=$(printf '%s\n' "$line" | sed -n 's/.*"src"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    mode=$(printf '%s\n' "$line" | sed -n 's/.*"mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    if printf '%s\n' "$line" | grep -q '"dst"[[:space:]]*:[[:space:]]*{'; then
+      # Tool-dependent destination, resolved with the chosen tool.
+      dst=$(printf '%s\n' "$line" | sed -n "s/.*\"$TOOL\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
+    else
+      dst=$(printf '%s\n' "$line" | sed -n 's/.*"dst"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    fi
+    case "$mode" in
+      copy)
+        mkdir -p "$(dirname "$dst")"
+        cp "$mdir/$src" "$dst"
+        case "$src" in *.sh) chmod +x "$dst" ;; esac
+        ;;
+      copy-if-missing)
+        if [ ! -f "$dst" ]; then
+          mkdir -p "$(dirname "$dst")"
+          cp "$mdir/$src" "$dst"
+        fi
+        ;;
+      append-section)
+        inject_append_section "$dst" "$m" "$mdir/$src"
+        ;;
+      *)
+        fail "Unknown inject mode '$mode' in module $m"
+        exit 1
+        ;;
+    esac
+  done < <(manifest_injects "$mdir/manifest.json")
+}
+
 # ── Copy templates ─────────────────────────────────────
 info "Installing harness templates..."
 
@@ -187,7 +311,15 @@ cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
 [ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
 
 if [ ! -f "harness/feature_list.json" ]; then
-  sed "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+  MODULES_JSON=""
+  if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
+    for m in "${MODULES_SELECTED[@]}"; do
+      MODULES_JSON="${MODULES_JSON:+$MODULES_JSON, }\"$m\""
+    done
+  fi
+  sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+      -e "s|{{MODULES}}|$MODULES_JSON|g" \
+      -e "s|{{AUDIT_LEVEL}}|$AUDIT_LEVEL|g" \
       "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
 else
   ok "Keeping existing harness/feature_list.json"
@@ -227,6 +359,18 @@ else
 fi
 
 ok "Templates installed"
+
+# ── Inject optional modules ────────────────────────────
+if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
+  info "Injecting modules..."
+  for m in "${MODULES_SELECTED[@]}"; do
+    inject_module "$m"
+  done
+  info "Modules installed: ${MODULES_SELECTED[*]}"
+fi
+if [ "$AUDIT_LEVEL" != "basic" ]; then
+  info "Audit level: $AUDIT_LEVEL"
+fi
 
 # ── Validation ─────────────────────────────────────────
 echo ""
@@ -276,6 +420,13 @@ check_file "docs/conventions.md"
 check_file "docs/specs.md"
 check_file "docs/verification.md"
 check_dir "harness/specs"
+
+for m in "${MODULES_SELECTED[@]:+${MODULES_SELECTED[@]}}"; do
+  while IFS= read -r vpath; do
+    if [ -z "$vpath" ]; then continue; fi
+    check_file "$vpath"
+  done < <(manifest_list "$TEMPLATES_DIR/modules/$m/manifest.json" "verify")
+done
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then

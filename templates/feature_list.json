@@ -1,7 +1,9 @@
 {
   "project": {
     "name": "{{PROJECT_NAME}}",
-    "parallel": false
+    "parallel": false,
+    "modules": [{{MODULES}}],
+    "audit_level": "{{AUDIT_LEVEL}}"
   },
   "features": []
 }

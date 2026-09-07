@@ -61,6 +61,26 @@ assert_executable() {  # assert_executable <name> <path>
   fi
 }
 
+assert_count() {  # assert_count <name> <pattern> <file> <expected-count>
+  local got
+  got=$(grep -c "$2" "$3" 2>/dev/null || true)
+  if [ "$got" -eq "$4" ]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1: expected $4 of '$2' in $3, got $got")
+    echo "    FAIL: '$2' appears $got times in $3 (expected $4)"
+  fi
+}
+
+assert_no_dir() {  # assert_no_dir <name> <path>
+  if [ ! -d "$2" ]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1: dir $2 should not exist")
+    echo "    FAIL: dir $2 should not exist"
+  fi
+}
+
 # ── Shared layout assertions (everything except docs/ under harness/) ──
 assert_harness_layout() {  # assert_harness_layout <test-name> <project-dir>
   local t="$1" d="$2"
@@ -322,6 +342,63 @@ PYEOF
   fi
 }
 
+test_modules_install() {
+  local t="--modules installs module files and records them in feature_list.json"
+  run_test "$t"
+  local d; d=$(new_project "modules-basic")
+  (cd "$d" && "$INIT" --tool=opencode --modules=architecture-catalog,decision-memory --audit-level=standard >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/docs/architecture-options.md"
+  assert_file "$t" "$d/harness/decisions/_template.md"
+  assert_grep "$t" '"architecture-catalog"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"decision-memory"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "standard"' "$d/harness/feature_list.json"
+}
+
+test_default_install_no_modules() {
+  local t="default install records empty modules and basic audit level"
+  run_test "$t"
+  local d; d=$(new_project "default-nomod")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" '"modules": \[\]' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
+  assert_no_dir "$t" "$d/harness/tools"
+  assert_no_file "$t" "$d/harness/baselines.json"
+  assert_no_file "$t" "$d/harness/wekan.json"
+  assert_no_dir "$t" "$d/harness/decisions"
+  assert_no_file "$t" "$d/docs/architecture-options.md"
+  assert_no_file "$t" "$d/docs/iteration-protocol.md"
+}
+
+test_invalid_module_rejected() {
+  local t="--modules with an unknown name is rejected"
+  run_test "$t"
+  local d; d=$(new_project "invalid-module")
+  if (cd "$d" && "$INIT" --tool=claude --modules=nope >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: should exit non-zero")
+    echo "    FAIL: init.sh accepted --modules=nope"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
+test_invalid_audit_level_rejected() {
+  local t="invalid --audit-level value is rejected"
+  run_test "$t"
+  local d; d=$(new_project "invalid-audit")
+  if (cd "$d" && "$INIT" --tool=claude --audit-level=paranoid >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: should exit non-zero")
+    echo "    FAIL: init.sh accepted --audit-level=paranoid"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -336,6 +413,10 @@ test_force_switch_tool
 test_verify_script_runs
 test_python_stack
 test_module_manifests_valid
+test_modules_install
+test_default_install_no_modules
+test_invalid_module_rejected
+test_invalid_audit_level_rejected
 
 echo ""
 echo "────────────────────────────────────────"
