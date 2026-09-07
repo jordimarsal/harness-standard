@@ -493,6 +493,26 @@ test_security_audit_module() {
   assert_grep "$t" "Checklist" "$d/audit-report.txt"
 }
 
+test_modules_install_strict() {
+  local t="strict install injects audit modules exactly once, C7, and feature_list entries"
+  run_test "$t"
+  local d; d=$(new_project "modules-strict")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=opencode --modules=security-audit,performance-benchmarks --audit-level=strict >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_executable "$t" "$d/harness/tools/audit-security.sh"
+  assert_executable "$t" "$d/harness/tools/bench.sh"
+  assert_file "$t" "$d/harness/baselines.json"
+  assert_count "$t" "harness:module:security-audit:start" "$d/docs/verification.md" 1
+  assert_count "$t" "harness:module:performance-benchmarks:start" "$d/docs/verification.md" 1
+  assert_grep "$t" "C7 — Audit" "$d/harness/CHECKPOINTS.md"
+  assert_grep "$t" '"security-audit"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"performance-benchmarks"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "strict"' "$d/harness/feature_list.json"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -514,6 +534,7 @@ test_invalid_audit_level_rejected
 test_module_filtered_by_stack
 test_project_scanner_module
 test_security_audit_module
+test_modules_install_strict
 
 echo ""
 echo "────────────────────────────────────────"
