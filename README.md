@@ -50,6 +50,22 @@ Example:
 /path/to/harness-standard/init.sh --tool=opencode --modules=security-audit,performance-benchmarks --audit-level=strict
 ```
 
+### Machine interface (Protocol v1)
+
+`docs/protocol.md` is the machine-facing contract: file formats, invariants, and
+the JSON output of the deterministic tools. Any orchestrator (human, Claude Code,
+opencode, or an external graph runtime) can consume a harness install:
+
+```bash
+python3 harness/tools/validate-feature-list.py --json harness/feature_list.json
+python3 harness/tools/check-traceability.py --all --json
+bash harness/tools/audit-security.sh --json   # security-audit module
+bash harness/tools/bench.sh --json            # performance-benchmarks module
+python3 harness/tools/scan.py --json --summary  # project-scanner module
+```
+
+The frozen eval scenarios live in `evals-fixtures/` with their expected outcomes.
+
 ### Reinstalling
 
 The installer refuses to run twice in the same project. To reinstall (e.g. to switch tool or refresh templates), use `--force`:

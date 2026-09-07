@@ -37,6 +37,11 @@ Read `"audit_level"` from the `project` section of `harness/feature_list.json`
 - **strict** (additionally, when `harness/tools/bench.sh` exists) — run
   `bash harness/tools/bench.sh`; reject if a benchmark regresses beyond the
   critical threshold defined in `harness/baselines.json`.
+- **Traceability (when `harness/tools/check-traceability.py` exists)** — run
+  `python3 harness/tools/check-traceability.py --all` before the verdict. A
+  non-zero exit (coverage gaps) rejects the approval. Your semantic judgment
+  (does the test really verify the requirement?) still applies on top — the
+  script only proves the mapping exists.
 
 Checkpoint **C7** in `harness/CHECKPOINTS.md` (when present) reflects these rules.
 

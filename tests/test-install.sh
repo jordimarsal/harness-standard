@@ -864,6 +864,46 @@ PYEOF
   fi
 }
 
+test_evals_fixtures() {
+  local t="evals fixtures: checker verdicts match EXPECTED outcomes"
+  run_test "$t"
+  if [ ! -d "$REPO_DIR/evals-fixtures" ]; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: evals-fixtures missing")
+    echo "    FAIL: evals-fixtures does not exist"
+    return
+  fi
+  PASS=$((PASS + 1))
+  local d; d=$(new_project "evals-fx")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  # 01: full coverage -> PASS
+  cp -r "$REPO_DIR/evals-fixtures/01-traceability-clean/project/." "$d/"
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > r1.json 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: fixture 01 should PASS")
+    echo "    FAIL: fixture 01 verdict"
+  fi
+  assert_grep "$t" '"verdict": "PASS"' "$d/r1.json"
+  # 02: gap -> FAIL
+  rm -rf "$d/harness" "$d/tests"
+  (cd "$d" && "$INIT" --force --tool=opencode >/dev/null)
+  cp -r "$REPO_DIR/evals-fixtures/02-traceability-gap/project/." "$d/"
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > r2.json 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: fixture 02 should FAIL")
+    echo "    FAIL: fixture 02 verdict"
+  else
+    PASS=$((PASS + 1))
+  fi
+  assert_grep "$t" '"verdict": "FAIL"' "$d/r2.json"
+  # 03: planted bug fixture is self-describing (structural check only)
+  assert_file "$t" "$REPO_DIR/evals-fixtures/03-planted-security-bug/EXPECTED.md"
+  assert_file "$t" "$REPO_DIR/evals-fixtures/03-planted-security-bug/project/src/core/db.py"
+  assert_grep "$t" "REJECT" "$REPO_DIR/evals-fixtures/03-planted-security-bug/EXPECTED.md"
+}
+
 test_force_modules_replace_sections() {
   local t="--force with modules replaces injected sections and preserves user state"
   run_test "$t"
@@ -985,6 +1025,7 @@ test_bench_json_output
 test_scan_json_output
 test_feature_list_validator
 test_traceability_checker
+test_evals_fixtures
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_force_switch_modules_metadata
