@@ -26,7 +26,7 @@ from pathlib import Path
 EXCLUDED_DIRS = {
     ".git", ".hg", ".svn", ".venv", "venv", "env", "__pycache__",
     "node_modules", ".tox", ".mypy_cache", ".pytest_cache",
-    "build", "dist", ".harness",
+    "build", "dist", ".harness", "harness",
 }
 REGION_RE = re.compile(r"#\s*region\s+(.+)")
 

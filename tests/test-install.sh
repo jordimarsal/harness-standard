@@ -659,8 +659,7 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["tool"] == "scan" and d["protocol"] == 1 and d["command"] == "summary"
 assert d["total_files"] == len(d["files"]) and "core/models.py" in d["files"]
-assert d["high_risk"] == []
-assert all("core/" not in f for fs in d["duplicates"].values() for f in fs)
+assert d["duplicates"] == {} and d["high_risk"] == []
 sys.exit(0)
 PYEOF
     PASS=$((PASS + 1))

@@ -55,6 +55,10 @@ Per feature `harness/specs/<name>/`:
 
 Validation: `python3 harness/tools/check-traceability.py --all` (exit 0 covered, 1 gaps, `--json` for machine output).
 
+Limitation (v1): traceability tables are matched by `R<n>` identifier globally across
+all `impl_*.md` files, not per feature — repos reusing `R1..Rn` across features must
+disambiguate manually until feature-keyed tables (v1.1).
+
 ## 5. Tool JSON contracts
 
 Every tool: `"tool"` + `"protocol": 1` first fields; no timestamps; same exit codes

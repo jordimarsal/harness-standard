@@ -112,6 +112,7 @@ case "$STACK" in
       if [ "$JSON" -eq 1 ]; then
         bandit -r . -x ./.venv,./venv,./node_modules -q -f json > "$REPORT" 2>/dev/null || true
         FINDINGS_JSON="$(extract_bandit_json "$REPORT")"
+        [ -n "$FINDINGS_JSON" ] || FINDINGS_JSON="[]"
         if grep -q '"issue_severity": "HIGH"' "$REPORT"; then
           HIGH=1
         fi
@@ -211,8 +212,9 @@ case "$STACK" in
     ;;
 esac
 
+[ -n "$FINDINGS_JSON" ] || FINDINGS_JSON="[]"
+
 if [ "$JSON" -eq 1 ]; then
-  MODE_DETECT=1
   VERDICT="PASS"
   [ "$HIGH" -eq 1 ] && VERDICT="REJECT"
   SKIPPED_JSON="[]"
