@@ -29,6 +29,27 @@ The installer asks whether the harness will be driven by **claude** or **opencod
 
 Everything else groups under `harness/`; only `docs/` stays at the project root.
 
+### Optional capability modules
+
+During an interactive install you can pick optional modules from a menu (default: none).
+Non-interactive: `--modules=m1,m2` and `--audit-level=basic|standard|strict` (default `basic`).
+
+| Module | What it adds |
+|---|---|
+| `architecture-catalog` | `docs/architecture-options.md` — pattern catalog for design decisions |
+| `iterative-refinement` | `docs/iteration-protocol.md` — adaptive iteration + adversarial review protocol |
+| `security-audit` | Security checklist in `docs/verification.md`, `harness/tools/audit-security.sh`, checkpoint C7 |
+| `performance-benchmarks` | Benchmark rules, `harness/tools/bench.sh`, `harness/baselines.json`, checkpoint C7 |
+| `decision-memory` | `harness/decisions/` with an ADR template |
+| `project-scanner` | `harness/tools/scan.py` — deterministic Python scanner (python stack only) |
+| `wekan-tickets` | `wekan-tasks` skill + `harness/wekan.json` — mirrors workflow states on a Wekan board |
+
+Example:
+
+```bash
+/path/to/harness-standard/init.sh --tool=opencode --modules=security-audit,performance-benchmarks --audit-level=strict
+```
+
 ### Reinstalling
 
 The installer refuses to run twice in the same project. To reinstall (e.g. to switch tool or refresh templates), use `--force`:
@@ -38,6 +59,8 @@ The installer refuses to run twice in the same project. To reinstall (e.g. to sw
 ```
 
 `--force` refreshes all templates but preserves user state: `harness/feature_list.json`, `harness/progress/`, `harness/specs/`, `docs/architecture.md` and `docs/conventions.md`.
+
+> **Switching module sets with `--force`:** the `modules` and `audit_level` entries in `harness/feature_list.json` are updated to the new selection, but files belonging to removed modules are **not** deleted automatically — remove them by hand (e.g. `harness/tools/scan.py`, `docs/architecture-options.md`, `harness/tools/bench.sh`). User-state files (`harness/baselines.json`, `harness/wekan.json`, `harness/decisions/`) are always preserved.
 
 ## After installation
 
@@ -65,7 +88,9 @@ Every feature goes through:
 {
   "project": {
     "name": "my-project",
-    "parallel": false
+    "parallel": false,
+    "modules": ["security-audit"],
+    "audit_level": "standard"
   },
   "features": [
     {
@@ -109,6 +134,10 @@ your-project/
     ├── progress/            # Session state
     │   ├── current.md
     │   └── history.md
+    ├── tools/                # Module tools (if modules installed)
+    ├── baselines.json        # Benchmark baselines (if benchmarks module)
+    ├── decisions/            # ADRs (if decision-memory module)
+    ├── wekan.json            # Wekan mirror config (if wekan-tickets module)
     └── specs/               # Feature specs (created per feature)
 ```
 
