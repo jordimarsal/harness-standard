@@ -21,7 +21,7 @@
 | `harness/progress/history.md`       | Append-only log of previous sessions                                        | When you need historical context |
 | `harness/specs/<feature>/`          | `requirements.md` + `design.md` + `tasks.md` (Kiro-style)                  | Before implementing any feature  |
 | `docs/architecture.md`      | What "doing a good job" means in this project                               | Before implementing              |
-| `docs/conventions.md`       | Style rules, naming, structure                                              | Before writing code              |
+| `docs/conventions.md`       | Style rules, naming, structure, and **Sonar/code-quality rules** (logging, resources, AssertJ, Docker) | Before writing code              |
 | `docs/specs.md`             | SDD process: EARS notation, 3 files, human approval gate                   | Before writing or reading a spec |
 | `docs/verification.md`      | How to verify your work works (including requirement traceability)          | Before marking a task as `done`  |
 | `harness/CHECKPOINTS.md`            | Objective criteria for "correct final state"                                | For self-assessment              |

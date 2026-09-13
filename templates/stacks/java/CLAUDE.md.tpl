@@ -44,3 +44,11 @@ When dispatching subagents, instruct them to **write results to files** and retu
   - Prefer immutability (final fields, records where applicable).
   - JUnit 5 for testing.
   - No commented-out code or debug prints.
+  - Assume a modern Java LTS (21+): prefer `record` for immutable value objects, `Math.clamp(v, min, max)` over `Math.max(min, Math.min(v, max))`, and unnamed variables `_` for unused catch params (`catch (RuntimeException _)`).
+  - **Logging:** never `System.out`/`System.err`; use the project's SLF4J logger. Pass the throwable as the last arg (`LOG.error("msg", e)`), and defer expensive args with a `Supplier` / `"{}"` lambda rather than precomputing the string.
+  - **Resources:** wrap every `AutoCloseable` (stores, containers, pools, files) in **try-with-resources**. A class-scoped container started in `@BeforeAll`/`@AfterAll` that cannot use try-with-resources should be annotated `@SuppressWarnings("resource")` with a comment explaining why.
+  - **APIs:** no wildcard return types — return `ApiResponse<Object>`, not `ApiResponse<?>`; a constructor with >7 params → use a **Builder**, not a parameter object.
+  - **Control flow:** avoid `break`/`continue`/named labels in loops — extract a helper predicate and `return` early; keep methods small (extract helpers) to stay under cognitive-complexity limits; remove unused locals/fields.
+  - **Tests:** AssertJ fluent form (`hasSize`, `containsKeys`, `containsEntry`, `hasSameHashCodeAs`, `hasToString`) instead of `.size()`/`.keySet()`/`.hashCode()` intermediates; no `Thread.sleep` or `try { … } catch (…) { fail(…); }` — use **Awaitility**; repeated reject/accept cases → `@ParameterizedTest` + `@ValueSource`; hoist constant / heavy strings (e.g. `"x".repeat(129)`, `URI.create(...)`, `Duration.of(...)`) out of lambdas.
+  - **Docker:** pin base images by **digest**, not floating tags (`eclipse-temurin@sha256:…`).
+  - **Static analysis:** the project is scanned by SonarQube (rules surface as `java:S<nnn>` / `docker:S<nnn>`). Follow the above proactively so the CI gate stays green without a cleanup pass; fix at the source, never suppress the rule.
