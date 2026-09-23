@@ -1,0 +1,35 @@
+name: Stack not detected
+description: The installer picked the wrong stack (or "generic") for this project.
+title: "[stack] not detected: "
+labels: ["installer", "stack-detection"]
+body:
+  - type: input
+    id: stack
+    attributes:
+      label: Expected stack
+      placeholder: "e.g. kotlin-multiplatform"
+    validations:
+      required: true
+  - type: textarea
+    id: markers
+    attributes:
+      label: Manifest files present
+      description: List the files the detector should look at.
+      placeholder: "build.gradle.kts, settings.gradle.kts, gradle.properties"
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Installer output
+      description: Paste the line starting with "Detected stack:".
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and shell
+      placeholder: "macOS 15 / zsh"
+    validations:
+      required: false
