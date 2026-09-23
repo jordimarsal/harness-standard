@@ -102,6 +102,8 @@ assert_harness_layout() {  # assert_harness_layout <test-name> <project-dir>
   assert_no_file "$t" "$d/init.sh"
   assert_no_file "$t" "$d/progress"
   assert_no_file "$t" "$d/specs"
+  assert_file "$t" "$d/HARNESS.md"
+  assert_grep "$t" "^## Next" "$d/HARNESS.md"
 }
 
 new_project() {  # new_project <name> — echoes the created dir
@@ -996,6 +998,24 @@ PYEOF
   assert_no_file "$t" "$d2/.claude/skills/wekan-tasks/SKILL.md"
 }
 
+test_remote_install() {
+  local t="install.sh bootstraps a fresh project from a local clone"
+  run_test "$t"
+  local d; d=$(new_project "remote")
+  if HARNESS_REPO_URL="$REPO_DIR" HARNESS_REF=HEAD \
+       bash "$REPO_DIR/install.sh" --tool=claude --dest "$d" > "$d/out.txt" 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install.sh exited non-zero")
+    echo "    FAIL: see $d/out.txt"
+    return
+  fi
+  assert_file "$t" "$d/HARNESS.md"
+  assert_file "$t" "$d/CLAUDE.md"
+  assert_grep "$t" "^Next: claude" "$d/out.txt"
+  assert_count "$t" "^Next:" "$d/out.txt" 1
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -1027,6 +1047,7 @@ test_traceability_checker
 test_evals_fixtures
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
+test_remote_install
 test_force_switch_modules_metadata
 
 echo ""

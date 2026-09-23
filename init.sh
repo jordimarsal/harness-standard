@@ -528,16 +528,38 @@ done
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
   ok "Harness installed successfully for stack: $STACK (tool: $TOOL)"
-  echo ""
-  info "Next steps:"
-  info "  1. Edit docs/architecture.md with your project's architecture."
-  info "  2. Edit docs/conventions.md with your project's coding conventions."
-  info "  3. Add features to harness/feature_list.json."
+
   if [ "$TOOL" = "claude" ]; then
-    info "  4. Start Claude Code and let the leader agent guide you."
+    ENTRY_FILE="CLAUDE.md"
+    ROLES_DIR=".claude/agents/"
   else
-    info "  4. Start opencode and let the leader agent guide you."
+    ENTRY_FILE="AGENTS.md"
+    ROLES_DIR=".opencode/agent/"
   fi
+
+  cat > HARNESS.md <<EOF
+# Harness — $PROJECT_NAME
+
+Installed with [harness-standard](https://github.com/jordimarsal/harness-standard) (\`$TOOL\`).
+
+- **Stack detected:** $STACK
+- **Roles:** Leader · Spec Author · Implementer · Reviewer (\`$ROLES_DIR\`)
+- **Gates:** \`harness/CHECKPOINTS.md\` · \`docs/verification.md\`
+- **Process:** \`docs/specs.md\` — Spec-Driven Development with a human approval gate
+
+## Next
+
+1. Edit \`docs/architecture.md\` and \`docs/conventions.md\` for this project.
+2. Add features to \`harness/feature_list.json\`.
+3. Start the leader: \`$TOOL\`
+
+First prompt:
+
+> Read $ENTRY_FILE and start the leader workflow. Pick the first pending feature.
+EOF
+
+  echo ""
+  echo "Next: $TOOL — open $TOOL, then prompt: Read $ENTRY_FILE and start the leader workflow."
 else
   fail "Harness installation incomplete. Resolve errors above."
 fi
