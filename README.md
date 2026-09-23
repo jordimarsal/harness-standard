@@ -32,6 +32,9 @@ writes `HARNESS.md` into your repo with the next step.
 `jordimp.net` is built with this harness. Its own repo is the reference install:
 https://jordimp.net
 
+Badge contract: any "built with harness-standard" badge must link
+[github.com/jordimarsal/harness-standard](https://github.com/jordimarsal/harness-standard) and use the install string above verbatim.
+
 ## Stacks
 
 TypeScript · Node.js · Java · Python · Android · Rust · Generic — 7 stacks.
