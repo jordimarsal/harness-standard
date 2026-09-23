@@ -102,6 +102,8 @@ assert_harness_layout() {  # assert_harness_layout <test-name> <project-dir>
   assert_no_file "$t" "$d/init.sh"
   assert_no_file "$t" "$d/progress"
   assert_no_file "$t" "$d/specs"
+  assert_file "$t" "$d/HARNESS.md"
+  assert_grep "$t" "^## Next" "$d/HARNESS.md"
 }
 
 new_project() {  # new_project <name> — echoes the created dir
