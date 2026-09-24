@@ -18,6 +18,9 @@ curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=opencode
 The installer detects your stack, copies the roles, conventions and gates, and
 writes `HARNESS.md` into your repo with the next step.
 
+Requires `git`. Non-interactive installs (CI, pipes) skip the prompts and use
+defaults: tool `claude`, no optional modules, audit level `basic`.
+
 ## What gets installed
 
 - **Leader** — orchestrates, stops at the human approval gate.

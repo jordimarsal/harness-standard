@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_URL="${HARNESS_REPO_URL:-https://github.com/jordimarsal/harness-standard.git}"
-REF="${HARNESS_REF:-v0.1.0}"
+REF="${HARNESS_REF:-v0.1.1}"
 DEST="."
 TOOL=""
 PASSTHRU=()
