@@ -69,20 +69,29 @@ if [ -n "$AUDIT_LEVEL" ]; then
   esac
 fi
 
+# Interactive prompts require a TTY (curl pipes and CI have none).
+# HARNESS_FORCE_TTY=1 forces them (used by the test suite).
+is_interactive() { [ -t 0 ] || [ "${HARNESS_FORCE_TTY:-0}" = "1" ]; }
+
 if [ -z "$TOOL" ]; then
-  echo ""
-  echo "Which AI tool will drive this harness?"
-  echo "  [c]laude    — Claude Code (generates CLAUDE.md + .claude/)"
-  echo "  [o]pencode  — opencode   (generates AGENTS.md + .opencode/)"
-  while [ -z "$TOOL" ]; do
-    printf "Choice [c/o]: "
-    read -r answer
-    case "$answer" in
-      c|claude)   TOOL="claude" ;;
-      o|opencode) TOOL="opencode" ;;
-      *) warn "Please answer 'c' (claude) or 'o' (opencode)." ;;
-    esac
-  done
+  if is_interactive; then
+    echo ""
+    echo "Which AI tool will drive this harness?"
+    echo "  [c]laude    — Claude Code (generates CLAUDE.md + .claude/)"
+    echo "  [o]pencode  — opencode   (generates AGENTS.md + .opencode/)"
+    while [ -z "$TOOL" ]; do
+      printf "Choice [c/o]: "
+      read -r answer
+      case "$answer" in
+        c|claude)   TOOL="claude" ;;
+        o|opencode) TOOL="opencode" ;;
+        *) warn "Please answer 'c' (claude) or 'o' (opencode)." ;;
+      esac
+    done
+  else
+    warn "No TTY detected — defaulting to tool 'claude'. Pass --tool=claude|opencode to choose."
+    TOOL="claude"
+  fi
 fi
 info "Tool: $TOOL"
 
@@ -178,59 +187,67 @@ if [ -n "$MODULES_FLAG" ]; then
     fi
   done
 else
-  # Mandatory interactive menu (§4.2): every module is always presented.
-  echo ""
-  echo "Optional capability modules (none are installed by default):"
-  menu_i=1
-  for m in "${MODULES_AVAILABLE[@]:+${MODULES_AVAILABLE[@]}}"; do
-    mf="$TEMPLATES_DIR/modules/$m/manifest.json"
-    desc="$(manifest_str "$mf" "description")"
-    if module_supports_stack "$m" "$STACK"; then
-      mark=""
-    else
-      mark="  [incompatible with stack: $STACK — will be skipped]"
-    fi
-    printf "  %d) %-24s %s%s\n" "$menu_i" "$m" "$desc" "$mark"
-    MENU_MAP[$menu_i]="$m"
-    menu_i=$((menu_i + 1))
-  done
-  printf "Select modules to install (comma-separated numbers, Enter = none): "
-  read -r answer || answer=""
-  if [ -n "$answer" ]; then
-    IFS=',' read -ra nums <<< "$answer"
-    for n in "${nums[@]}"; do
-      n="$(printf '%s' "$n" | tr -d '[:space:]')"
-      if [ -z "$n" ]; then continue; fi
-      m="${MENU_MAP[$n]:-}"
-      if [ -z "$m" ]; then
-        warn "Ignoring invalid module number: $n"
-      elif module_supports_stack "$m" "$STACK"; then
-        MODULES_SELECTED+=("$m")
+  if is_interactive; then
+    # Mandatory interactive menu (§4.2): every module is always presented.
+    echo ""
+    echo "Optional capability modules (none are installed by default):"
+    menu_i=1
+    for m in "${MODULES_AVAILABLE[@]:+${MODULES_AVAILABLE[@]}}"; do
+      mf="$TEMPLATES_DIR/modules/$m/manifest.json"
+      desc="$(manifest_str "$mf" "description")"
+      if module_supports_stack "$m" "$STACK"; then
+        mark=""
       else
-        warn "Module '$m' does not support stack '$STACK' — skipped."
+        mark="  [incompatible with stack: $STACK — will be skipped]"
       fi
+      printf "  %d) %-24s %s%s\n" "$menu_i" "$m" "$desc" "$mark"
+      MENU_MAP[$menu_i]="$m"
+      menu_i=$((menu_i + 1))
     done
+    printf "Select modules to install (comma-separated numbers, Enter = none): "
+    read -r answer || answer=""
+    if [ -n "$answer" ]; then
+      IFS=',' read -ra nums <<< "$answer"
+      for n in "${nums[@]}"; do
+        n="$(printf '%s' "$n" | tr -d '[:space:]')"
+        if [ -z "$n" ]; then continue; fi
+        m="${MENU_MAP[$n]:-}"
+        if [ -z "$m" ]; then
+          warn "Ignoring invalid module number: $n"
+        elif module_supports_stack "$m" "$STACK"; then
+          MODULES_SELECTED+=("$m")
+        else
+          warn "Module '$m' does not support stack '$STACK' — skipped."
+        fi
+      done
+    fi
+  else
+    info "No TTY detected — no optional modules installed. Pass --modules=m1,m2 to select."
   fi
 fi
 
 # Audit level prompt (skipped when --audit-level was given).
 if [ -z "$AUDIT_LEVEL" ]; then
-  echo ""
-  echo "Audit level applied by the reviewer (when audit modules are installed):"
-  echo "  1) basic    — checklist-only review (default)"
-  echo "  2) standard — run harness/tools/audit-security.sh on every review"
-  echo "  3) strict   — standard + benchmark comparison vs harness/baselines.json"
-  printf "Choice [1/2/3, Enter = basic]: "
-  read -r answer || answer=""
-  case "$answer" in
-    ""|1|basic) AUDIT_LEVEL="basic" ;;
-    2|standard) AUDIT_LEVEL="standard" ;;
-    3|strict)   AUDIT_LEVEL="strict" ;;
-    *)
-      warn "Invalid audit level '$answer'; using 'basic'."
-      AUDIT_LEVEL="basic"
-      ;;
-  esac
+  if is_interactive; then
+    echo ""
+    echo "Audit level applied by the reviewer (when audit modules are installed):"
+    echo "  1) basic    — checklist-only review (default)"
+    echo "  2) standard — run harness/tools/audit-security.sh on every review"
+    echo "  3) strict   — standard + benchmark comparison vs harness/baselines.json"
+    printf "Choice [1/2/3, Enter = basic]: "
+    read -r answer || answer=""
+    case "$answer" in
+      ""|1|basic) AUDIT_LEVEL="basic" ;;
+      2|standard) AUDIT_LEVEL="standard" ;;
+      3|strict)   AUDIT_LEVEL="strict" ;;
+      *)
+        warn "Invalid audit level '$answer'; using 'basic'."
+        AUDIT_LEVEL="basic"
+        ;;
+    esac
+  else
+    AUDIT_LEVEL="basic"
+  fi
 fi
 
 AUDIT_LEVEL="${AUDIT_LEVEL:-basic}"

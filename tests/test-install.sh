@@ -166,7 +166,7 @@ test_interactive_prompt() {
   local t="interactive prompt accepts 'o' for opencode"
   run_test "$t"
   local d; d=$(new_project "interactive-o")
-  (cd "$d" && printf 'o\n' | "$INIT" >/dev/null) || {
+  (cd "$d" && printf 'o\n' | HARNESS_FORCE_TTY=1 "$INIT" >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -176,7 +176,7 @@ test_interactive_prompt() {
   local t2="interactive prompt accepts 'c' for claude"
   run_test "$t2"
   d=$(new_project "interactive-c")
-  (cd "$d" && printf 'c\n' | "$INIT" >/dev/null) || {
+  (cd "$d" && printf 'c\n' | HARNESS_FORCE_TTY=1 "$INIT" >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -201,7 +201,7 @@ test_interactive_module_menu() {
   run_test "$t"
   local d; d=$(new_project "interactive-menu")
   local out
-  out="$(cd "$d" && printf 'o\n\n\n' | "$INIT" 2>&1)" || {
+  out="$(cd "$d" && printf 'o\n\n\n' | HARNESS_FORCE_TTY=1 "$INIT" 2>&1)" || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -219,7 +219,7 @@ test_interactive_module_menu() {
   run_test "$t2"
   d=$(new_project "interactive-select")
   # menu order is the alphabetical module dir order; 1 = architecture-catalog
-  out="$(cd "$d" && printf 'o\n1,99\n\n' | "$INIT" 2>&1)" || {
+  out="$(cd "$d" && printf 'o\n1,99\n\n' | HARNESS_FORCE_TTY=1 "$INIT" 2>&1)" || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -231,7 +231,7 @@ test_interactive_module_menu() {
   local t3="interactive audit level prompt accepts standard"
   run_test "$t3"
   d=$(new_project "interactive-audit")
-  (cd "$d" && printf 'o\n\n2\n' | "$INIT" >/dev/null) || {
+  (cd "$d" && printf 'o\n\n2\n' | HARNESS_FORCE_TTY=1 "$INIT" >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t3: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -1016,6 +1016,43 @@ test_remote_install() {
   assert_count "$t" "^Next:" "$d/out.txt" 1
 }
 
+test_non_tty_no_prompts() {
+  local t="non-TTY stdin installs with defaults and prints no menus"
+  run_test "$t"
+  local d; d=$(new_project "notty-defaults")
+  local out
+  out="$(cd "$d" && timeout 10 "$INIT" </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_count "$t" "Select modules" "$d/init-output.txt" 0
+  assert_count "$t" "Choice \[c/o\]" "$d/init-output.txt" 0
+  assert_count "$t" "Choice \[1/2/3" "$d/init-output.txt" 0
+  assert_count "$t" "Which AI tool" "$d/init-output.txt" 0
+  assert_grep "$t" "No TTY detected" "$d/init-output.txt"
+  assert_grep "$t" '"modules": \[\]' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "basic"' "$d/harness/feature_list.json"
+  assert_file "$t" "$d/CLAUDE.md"
+  assert_harness_layout "$t" "$d"
+  assert_grep "$t" "Installed with \[harness-standard\]" "$d/HARNESS.md"
+
+  local t2="non-TTY with explicit flags skips TTY defaults cleanly"
+  run_test "$t2"
+  d=$(new_project "notty-flags")
+  out="$(cd "$d" && timeout 10 "$INIT" --tool=opencode --modules=decision-memory --audit-level=standard </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_count "$t2" "Select modules" "$d/init-output.txt" 0
+  assert_count "$t2" "Choice \[c/o\]" "$d/init-output.txt" 0
+  assert_count "$t2" "Choice \[1/2/3" "$d/init-output.txt" 0
+  assert_file "$t2" "$d/AGENTS.md"
+  assert_grep "$t2" '"decision-memory"' "$d/harness/feature_list.json"
+  assert_grep "$t2" '"audit_level": "standard"' "$d/harness/feature_list.json"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -1048,6 +1085,7 @@ test_evals_fixtures
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_remote_install
+test_non_tty_no_prompts
 test_force_switch_modules_metadata
 
 echo ""
