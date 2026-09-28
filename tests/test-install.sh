@@ -1082,7 +1082,7 @@ test_non_tty_no_prompts() {
 }
 
 # ── Main ───────────────────────────────────────────────
-TMP_ROOT="$(mktemp -d /tmp/opencode/harness-test-XXXXXX)"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/harness-test-XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 test_claude_mode_typescript
