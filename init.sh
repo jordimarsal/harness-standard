@@ -316,7 +316,6 @@ assert_inside_project() {  # assert_inside_project <path>
   local probe="$p"
   local rel
   root="$(pwd -P)"
-  root="$(pwd -P)"
   # Refuse any symlinked component (leaf or ancestors, including dangling).
   while [ "$probe" != "/" ] && [ "$probe" != "." ]; do
     if [ -L "$probe" ]; then
@@ -327,7 +326,9 @@ assert_inside_project() {  # assert_inside_project <path>
   done
   # Physical destination must stay under the physical project root.
   rel="${p#"$probe"}"
-  case "$(cd "$probe" && pwd -P)$rel" in
+  local resolved
+  resolved="$(cd "$(dirname "$probe")" 2>/dev/null && pwd -P)/$(basename "$probe")"
+  case "$resolved" in
     "$root"/*) ;;
     *) fail "Refusing to write outside the project root: $p"; exit 1 ;;
   esac

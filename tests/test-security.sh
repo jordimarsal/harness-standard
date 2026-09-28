@@ -26,7 +26,7 @@ d="$TMP_ROOT/appr"; mkdir -p "$d"
 mkdir -p "$d/harness/specs/demo"
 for f in requirements.md design.md tasks.md; do echo "# demo" > "$d/harness/specs/demo/$f"; done
 cat > "$d/harness/feature_list.json" <<'J'
-{"features": [{"id": 1, "name": "demo", "title": "D", "description": "D", "acceptance": ["A"], "status": "done"}]}
+{"project": {"name": "test", "parallel": false, "modules": [], "audit_level": "basic"}, "features": [{"id": 1, "name": "demo", "title": "D", "description": "D", "acceptance": ["A"], "status": "done"}]}
 J
 if (cd "$d" && python3 harness/tools/validate-feature-list.py harness/feature_list.json >/dev/null 2>&1); then
   FAIL=$((FAIL + 1)); echo "FAIL: $t — done accepted without APPROVAL"
