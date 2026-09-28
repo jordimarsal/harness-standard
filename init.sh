@@ -104,10 +104,10 @@ if [ "$FORCE" -eq 1 ]; then
   if [ -d .claude ] && [ -z "$(ls -A .claude 2>/dev/null)" ]; then rmdir .claude; fi
   if [ -d .opencode ] && [ -z "$(ls -A .opencode 2>/dev/null)" ]; then rmdir .opencode; fi
   if [ -d .claude ]; then
-    warn "Keeping non-harness files in .claude/: $(ls -A .claude 2>/dev/null | tr '\n' ' ')"
+    warn "Keeping non-harness files in .claude/: $(find .claude -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
   fi
   if [ -d .opencode ]; then
-    warn "Keeping non-harness files in .opencode/: $(ls -A .opencode 2>/dev/null | tr '\n' ' ')"
+    warn "Keeping non-harness files in .opencode/: $(find .opencode -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
   fi
   rm -f CLAUDE.md AGENTS.md opencode.json
 elif [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
@@ -302,7 +302,7 @@ esac
 PROJECT_NAME="$(basename "$(pwd)")"
 # Derived strings must be data, never sed program text.
 case "$PROJECT_NAME" in
-  ""|*[!A-Za-z0-9._\ \-]*)
+  ""|*[!A-Za-z0-9._\ -]*)
     warn "Directory name contains characters unsafe for template rendering; using 'project' as project name."
     PROJECT_NAME="project"
     ;;
@@ -314,7 +314,6 @@ assert_inside_project() {  # assert_inside_project <path>
   local p="$1"
   local root
   local probe="$p"
-  local rel
   root="$(pwd -P)"
   # Refuse any symlinked component (leaf or ancestors, including dangling).
   while [ "$probe" != "/" ] && [ "$probe" != "." ]; do
@@ -325,7 +324,6 @@ assert_inside_project() {  # assert_inside_project <path>
     probe="$(dirname "$probe")"
   done
   # Physical destination must stay under the physical project root.
-  rel="${p#"$probe"}"
   local resolved
   resolved="$(cd "$(dirname "$probe")" 2>/dev/null && pwd -P)/$(basename "$probe")"
   case "$resolved" in

@@ -3,7 +3,7 @@
 set -u
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 INIT="$REPO_DIR/init.sh"
-PASS=0; FAIL=0; FAILED_NAMES=()
+PASS=0; FAIL=0
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -98,7 +98,7 @@ fi
 t="sed injection blocked"
 d="$TMP_ROOT/sed-inj"
 mkdir -p "$d/x|touch PWNED_SEC_42 #"
-cd "$d/x|touch PWNED_SEC_42 #"
+cd "$d/x|touch PWNED_SEC_42 #" || exit 1
 touch requirements.txt
 bash "$REPO_DIR/init.sh" --tool=claude </dev/null >/dev/null 2>&1
 if [ -f PWNED_SEC_42 ]; then
@@ -106,7 +106,7 @@ if [ -f PWNED_SEC_42 ]; then
 else
   PASS=$((PASS + 1))
 fi
-cd "$TMP_ROOT"
+cd "$TMP_ROOT" || exit 1
 
 # 9. Force teardown preserves non-harness files
 t="force teardown preserves non-harness files"
