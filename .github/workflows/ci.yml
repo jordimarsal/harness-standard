@@ -30,4 +30,8 @@ jobs:
         run: shellcheck init.sh install.sh init-verify.sh tests/test-install.sh
 
       - name: Installer e2e tests
-        run: npm test
+        run: |
+          # checkout@v7 leaves PR checkouts in detached HEAD without a local
+          # main branch; install.sh's e2e clones --branch main from this path.
+          git branch main || true
+          npm test
