@@ -1,5 +1,7 @@
 # Harness Standard
 
+[![CI](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml)
+
 Install a repeatable process for coding agents in one command.
 
 ## The problem

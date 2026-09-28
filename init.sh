@@ -128,7 +128,7 @@ detect_stack() {
     echo "node"
     return
   fi
-  if [ -f "build.gradle" ] && [ -f "AndroidManifest.xml" -o -f "app/src/main/AndroidManifest.xml" ]; then
+  if [ -f "build.gradle" ] && { [ -f "AndroidManifest.xml" ] || [ -f "app/src/main/AndroidManifest.xml" ]; }; then
     echo "android"
     return
   fi
@@ -211,7 +211,7 @@ else
         mark="  [incompatible with stack: $STACK — will be skipped]"
       fi
       printf "  %d) %-24s %s%s\n" "$menu_i" "$m" "$desc" "$mark"
-      MENU_MAP[$menu_i]="$m"
+      MENU_MAP[menu_i]="$m"
       menu_i=$((menu_i + 1))
     done
     printf "Select modules to install (comma-separated numbers, Enter = none): "

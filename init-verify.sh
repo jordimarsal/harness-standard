@@ -22,14 +22,11 @@ echo "── 1. Checking harness files ─────────────�
 # Entry point + tool directory at the project root (claude or opencode)
 if [ -f "CLAUDE.md" ]; then
   ok "Exists CLAUDE.md"
-  ENTRY_OK=1
 elif [ -f "AGENTS.md" ]; then
   ok "Exists AGENTS.md"
-  ENTRY_OK=1
 else
   fail "Missing entry point: CLAUDE.md or AGENTS.md"
   EXIT_CODE=1
-  ENTRY_OK=0
 fi
 
 if [ -d ".claude" ] || [ -d ".opencode" ]; then
@@ -59,7 +56,7 @@ echo ""
 echo "── 2. Validating harness/feature_list.json ────────────"
 
 if command -v python3 >/dev/null 2>&1; then
-  python3 - <<'PY'
+  python3 - <<'PY' || EXIT_CODE=1
 import json, os, sys
 try:
     data = json.load(open("harness/feature_list.json"))
@@ -96,7 +93,6 @@ except Exception as e:
     print(f"[FAIL]  harness/feature_list.json invalid: {e}")
     sys.exit(1)
 PY
-  if [ $? -ne 0 ]; then EXIT_CODE=1; fi
 else
   warn "python3 not available — skipping harness/feature_list.json validation"
 fi
