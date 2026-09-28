@@ -1036,6 +1036,7 @@ test_remote_install() {
   else
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install.sh exited non-zero")
     echo "    FAIL: see $d/out.txt"
+    sed 's/^/      | /' "$d/out.txt"
     return
   fi
   assert_file "$t" "$d/HARNESS.md"
