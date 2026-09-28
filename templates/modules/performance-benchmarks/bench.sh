@@ -12,6 +12,7 @@ set -uo pipefail
 BASELINES="harness/baselines.json"
 MEASURED=0
 REJECT=0
+COMPARED=0
 REGRESSIONS="[]"
 RESULTS_JSON="[]"
 OUT="$(mktemp)"
@@ -62,7 +63,7 @@ PYEOF
     fi
     ;;
   typescript|node)
-    if [ -d "node_modules/vitest" ] && npx vitest bench --run > "$OUT" 2>&1; then
+    if [ -d "node_modules/vitest" ] && npx --no-install vitest bench --run > "$OUT" 2>&1; then
       [ "$JSON" -eq 1 ] || echo "## Runner: vitest bench"
       [ "$JSON" -eq 1 ] || tail -n 15 "$OUT"
       MEASURED=1
@@ -86,7 +87,7 @@ esac
 
 # Compare against baselines when we have measurements, a non-empty baseline
 # file, and python3 available (only the python runner produces parseable JSON).
-if [ "$MEASURED" -eq 1 ] && [ "$STACK" = "python" ] \
+if [ "$MEASURED" -eq 1 ] \
    && [ -s "$BASELINES" ] \
    && [ "$(cat "$BASELINES")" != "{}" ] \
    && command -v python3 >/dev/null 2>&1 \
@@ -124,6 +125,7 @@ for name, entry in base.items():
 regres.close()
 sys.exit(1 if reject else 0)
 PYEOF
+COMPARED=1
     REJECT=1
   fi
   if [ -f "$OUT.regres" ]; then
@@ -138,6 +140,12 @@ fi
 if [ "$JSON" -eq 1 ]; then
   MODE="checklist-only"
   [ "$STACK" = "python" ] || [ "$STACK" = "typescript" ] || [ "$STACK" = "node" ] || [ "$STACK" = "rust" ] && MODE="record-only"
+# Fail closed when measured but uncompared (non-python stacks)
+if [ "$MEASURED" -eq 1 ] && [ "$COMPARED" -eq 0 ]; then
+  REJECT=1
+  REGRESSIONS='["__uncompared__"]'
+  [ "$JSON" -eq 1 ] || echo "measured run could not be compared against $BASELINES (stack: $STACK) - strict gate refuses to pass"
+fi
   [ "$MEASURED" -eq 1 ] && MODE="run"
   VERDICT="PASS"
   [ "$REJECT" -eq 1 ] && VERDICT="REJECT"

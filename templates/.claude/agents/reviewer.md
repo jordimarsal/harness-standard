@@ -31,7 +31,7 @@ Read `"audit_level"` from the `project` section of `harness/feature_list.json`
   and confirm each item manually; record the confirmation in the review file.
 - **standard** (when `harness/tools/audit-security.sh` exists) — run
   `bash harness/tools/audit-security.sh` before the verdict, append the report to
-  `harness/progress/review_<name>.md`. Reject approval if it reports HIGH findings.
+  `harness/progress/review_<name>.md`. Reject approval if the script exits non-zero (meaning HIGH findings were reported).
 - **strict** (additionally, when `harness/tools/bench.sh` exists) — run
   `bash harness/tools/bench.sh`; reject if a benchmark regresses beyond the
   critical threshold defined in `harness/baselines.json`.

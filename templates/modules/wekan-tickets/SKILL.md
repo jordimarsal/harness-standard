@@ -37,7 +37,10 @@ CRED="$(sed -n 's/^"credentials_file"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p
 TOK="$(sed -n 's/^WEKAN_API_BEARER_TOKEN=//p' "$CRED")"
 USR="$(sed -n 's/^WEKAN_API_USER_ID=//p' "$CRED")"
 AUTH=(-H "Authorization: Bearer $TOK" -H "X-User-Id: $USR")
-# Self-signed certs → always: curl -sk
+# Self-signed / private-CA server: trust it explicitly via --cacert.
+# NEVER use -k/--insecure on a request that carries Authorization: Bearer.
+# WEKAN_CA_FILE="${WEKAN_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}"
+# Every request: curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" ...
 ```
 
 If the server is unreachable or credentials fail: log once in
@@ -51,7 +54,7 @@ If the server is unreachable or credentials fail: log once in
    them — never guess):
 
    ```bash
-   curl -sk "${AUTH[@]}" "$CFG_URL/api/boards"   # public boards, [{_id,title},...]
+   curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" "$CFG_URL/api/boards"   # public boards, [{_id,title},...]
    # fallback (needs mongo creds):
    docker exec wekan-mongo mongosh --quiet \
      "mongodb://$MUSR:$MPW@localhost:27017/test?authSource=admin" \
@@ -62,13 +65,13 @@ If the server is unreachable or credentials fail: log once in
    the five `list_map` lists exist:
 
    ```bash
-   BOARD=$(curl -sk "${AUTH[@]}" -X POST "$CFG_URL/api/boards" \
+   BOARD=$(curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X POST "$CFG_URL/api/boards" \
      -H "Content-Type: application/json" -d '{"title":"<project>"}' \
      | python3 -c "import json,sys; print(json.load(sys.stdin)['_id'])")
    # POST returns {_id, defaultSwimlaneId}; keep the swimlane id
-   SWIMLANE=$(curl -sk "${AUTH[@]}" "$CFG_URL/api/boards/$BOARD" | python3 -c "import json,sys; print(json.load(sys.stdin)['defaultSwimlaneId'])")
+   SWIMLANE=$(curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" "$CFG_URL/api/boards/$BOARD" | python3 -c "import json,sys; print(json.load(sys.stdin)['defaultSwimlaneId'])")
    for L in pending spec_ready in_progress blocked done; do
-     curl -sk "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/lists" \
+     curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/lists" \
        -H "Content-Type: application/json" -d "{\"title\":\"$L\"}"
    done
    ```
@@ -76,7 +79,7 @@ If the server is unreachable or credentials fail: log once in
 3. **Resolve list ids** once and reuse them:
 
    ```bash
-   curl -sk "${AUTH[@]}" "$CFG_URL/api/boards/$BOARD/lists"   # [{_id,title},...]
+   curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" "$CFG_URL/api/boards/$BOARD/lists"   # [{_id,title},...]
    ```
 
 ## Role traces (who does what, when)
@@ -99,21 +102,21 @@ re-search the board for the card.
 
 ```bash
 # Create a card — swimlaneId is REQUIRED (500 without it)
-curl -sk "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/lists/$LIST_PENDING/cards" \
+curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/lists/$LIST_PENDING/cards" \
   -H "Content-Type: application/json" \
   -d '{"title":"<feature title>","description":"<desc + acceptance>","authorId":"'$USR'","swimlaneId":"'$SWIMLANE'"}'
 # → {"_id":"<cardId>"}
 
 # Move a card to another list (= state transition)
-curl -sk "${AUTH[@]}" -X PUT "$CFG_URL/api/boards/$BOARD/lists/$OLD_LIST/cards/$CARD" \
+curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X PUT "$CFG_URL/api/boards/$BOARD/lists/$OLD_LIST/cards/$CARD" \
   -H "Content-Type: application/json" -d '{"listId":"'$NEW_LIST'"}'
 
 # Comment
-curl -sk "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/cards/$CARD/comments" \
+curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X POST "$CFG_URL/api/boards/$BOARD/cards/$CARD/comments" \
   -H "Content-Type: application/json" -d '{"comment":"spec_ready — see harness/specs/<name>/"}'
 
 # Set startAt / endAt / dueAt (ISO 8601; date-only saves as T00:00:00Z)
-curl -sk "${AUTH[@]}" -X PUT "$CFG_URL/api/boards/$BOARD/lists/$LIST/cards/$CARD" \
+curl -sS --cacert "$WEKAN_CA_FILE" "${AUTH[@]}" -X PUT "$CFG_URL/api/boards/$BOARD/lists/$LIST/cards/$CARD" \
   -H "Content-Type: application/json" -d '{"startAt":"2026-09-07","endAt":"2026-09-08"}'
 ```
 

@@ -135,7 +135,7 @@ test_claude_mode_typescript() {
     assert_file "$t" "$d/.claude/agents/$a.md"
   done
   assert_file "$t" "$d/.claude/settings.json"
-  assert_grep "$t" "npx vitest run" "$d/.claude/settings.json"
+  assert_grep "$t" "npx --no-install vitest run" "$d/.claude/settings.json"
   assert_harness_layout "$t" "$d"
   assert_no_file "$t" "$d/AGENTS.md"
   assert_no_file "$t" "$d/.opencode"
@@ -254,17 +254,35 @@ test_reinstall_refused() {
 }
 
 test_verify_script_runs() {
-  local t="copied harness/init.sh verification passes in fresh project"
+  local t="copied harness/init.sh verification passes with tests / fail-closed without"
   run_test "$t"
   local d; d=$(new_project "verify")
   (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
   }
+  # Without a test framework, the gate must fail closed (audit fix)
   if (cd "$d" && ./harness/init.sh >/dev/null 2>&1); then
-    PASS=$((PASS + 1))
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: harness/init.sh should fail closed without tests")
+    echo "    FAIL: gate attested green without running tests"
   else
-    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: harness/init.sh exited non-zero")
-    echo "    FAIL: harness/init.sh failed (no test framework project)"
+    PASS=$((PASS + 1))
+  fi
+  # With a test framework that passes, the gate must succeed
+  mkdir -p "$d/tests"
+  cat > "$d/tests/test_ok.py" <<'PYT'
+def test_ok():
+    assert True
+PYT
+  # Skip if python3/pytest unavailable
+  command -v python3 >/dev/null 2>&1 || return 0
+  pip3 install -q pytest 2>/dev/null || true
+  if python3 -m pytest --version >/dev/null 2>&1; then
+    if (cd "$d" && ./harness/init.sh >/dev/null 2>&1); then
+      PASS=$((PASS + 1))
+    else
+      FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: harness/init.sh failed with passing tests")
+      echo "    FAIL: gate should pass with green tests"
+    fi
   fi
 }
 
@@ -764,6 +782,7 @@ test_traceability_checker() {
 EOF
   cat > "$d/harness/progress/impl_session1.md" <<'EOF'
 # Implementation — feat-a
+feature: feat-a
 
 | Requirement | Test(s)            | Implementation file(s) | Status |
 |-------------|--------------------|------------------------|--------|
@@ -805,6 +824,7 @@ PYEOF
   # fix the table -> PASS (exit 0)
   cat > "$d/harness/progress/impl_session1.md" <<'EOF'
 # Implementation — feat-a
+feature: feat-a
 
 | Requirement | Test(s)                      | Implementation file(s) | Status |
 |-------------|------------------------------|------------------------|--------|
@@ -817,7 +837,7 @@ EOF
 def test_persist():
     assert True
 EOF
-  if (cd "$d" && python3 harness/tools/check-traceability.py --all --json > trace2.json 2>&1); then
+  if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > trace2.json 2>&1); then
     PASS=$((PASS + 1))
   else
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: checker failed after coverage completed")
@@ -826,6 +846,8 @@ EOF
   assert_grep "$t" '"verdict": "PASS"' "$d/trace2.json"
   # ghost test identifier must fail
   cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+feature: feat-a
+
 | Requirement | Test(s)          | Implementation file(s) | Status |
 |-------------|------------------|------------------------|--------|
 | R1          | test_ghost       | src/core/cart.py       | done   |
@@ -839,6 +861,8 @@ EOF
   fi
   # unresolved semantics: covered row with status != done -> no gap, but unresolved
   cat > "$d/harness/progress/impl_session1.md" <<'EOF'
+feature: feat-a
+
 | Requirement | Test(s)          | Implementation file(s) | Status |
 |-------------|------------------|------------------------|--------|
 | R1          | test_empty_cart  | src/core/cart.py       | done   |
@@ -881,6 +905,10 @@ test_evals_fixtures() {
   PASS=$((PASS + 1))
   # 01: full coverage -> PASS
   cp -r "$REPO_DIR/evals-fixtures/01-traceability-clean/project/." "$d/"
+  # Ensure feature: attribution (added by remediation)
+  if ! grep -qi '^feature:' "$d/harness/progress/impl_session1.md" 2>/dev/null; then
+    sed -i '1a feature: feat-a' "$d/harness/progress/impl_session1.md" 2>/dev/null || true
+  fi
   if (cd "$d" && python3 harness/tools/check-traceability.py --feature feat-a --json > r1.json 2>&1); then
     PASS=$((PASS + 1))
   else
@@ -1002,7 +1030,7 @@ test_remote_install() {
   local t="install.sh bootstraps a fresh project from a local clone"
   run_test "$t"
   local d; d=$(new_project "remote")
-  if HARNESS_REPO_URL="$REPO_DIR" HARNESS_REF=HEAD \
+  if HARNESS_REPO_URL="$REPO_DIR" HARNESS_REF=main \
        bash "$REPO_DIR/install.sh" --tool=claude --dest "$d" > "$d/out.txt" 2>&1; then
     PASS=$((PASS + 1))
   else

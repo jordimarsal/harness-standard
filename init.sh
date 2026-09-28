@@ -99,13 +99,23 @@ info "Tool: $TOOL"
 if [ "$FORCE" -eq 1 ]; then
   info "Force reinstall: refreshing templates."
   info "Preserved if present: harness/feature_list.json, harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md"
-  rm -rf .claude .opencode
+  rm -rf .claude/agents .opencode/agent .claude/skills/wekan-tasks .opencode/skill/wekan-tasks
+  rm -f CLAUDE.md AGENTS.md opencode.json .claude/settings.json
+  if [ -d .claude ] && [ -z "$(ls -A .claude 2>/dev/null)" ]; then rmdir .claude; fi
+  if [ -d .opencode ] && [ -z "$(ls -A .opencode 2>/dev/null)" ]; then rmdir .opencode; fi
+  if [ -d .claude ]; then
+    warn "Keeping non-harness files in .claude/: $(ls -A .claude 2>/dev/null | tr '\n' ' ')"
+  fi
+  if [ -d .opencode ]; then
+    warn "Keeping non-harness files in .opencode/: $(ls -A .opencode 2>/dev/null | tr '\n' ' ')"
+  fi
   rm -f CLAUDE.md AGENTS.md opencode.json
 elif [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
   fail "A harness is already installed in this directory (harness/, CLAUDE.md, AGENTS.md, .claude/ or .opencode/ exists)."
   fail "Remove existing harness files before reinstalling, or use --force to reinstall (keeps user state)."
   exit 1
 fi
+
 
 # ── Stack detection ────────────────────────────────────
 detect_stack() {
@@ -255,7 +265,7 @@ AUDIT_LEVEL="${AUDIT_LEVEL:-basic}"
 # ── Stack-specific variables ───────────────────────────
 case "$STACK" in
   typescript)
-    TEST_CMD="npx vitest run"
+    TEST_CMD="npx --no-install vitest run"
     BUILD_CMD="npx tsc"
     ;;
   node)
@@ -290,8 +300,39 @@ case "$STACK" in
 esac
 
 PROJECT_NAME="$(basename "$(pwd)")"
+# Derived strings must be data, never sed program text.
+case "$PROJECT_NAME" in
+  ""|*[!A-Za-z0-9._\ \-]*)
+    warn "Directory name contains characters unsafe for template rendering; using 'project' as project name."
+    PROJECT_NAME="project"
+    ;;
+esac
 
 # ── Module injection ───────────────────────────────────
+# ── Install-time write confinement ─────────────────────
+assert_inside_project() {  # assert_inside_project <path>
+  local p="$1"
+  local root
+  local probe="$p"
+  local rel
+  root="$(pwd -P)"
+  root="$(pwd -P)"
+  # Refuse any symlinked component (leaf or ancestors, including dangling).
+  while [ "$probe" != "/" ] && [ "$probe" != "." ]; do
+    if [ -L "$probe" ]; then
+      fail "Refusing to write through a symlink: $p"; exit 1
+    fi
+    [ -e "$probe" ] && break
+    probe="$(dirname "$probe")"
+  done
+  # Physical destination must stay under the physical project root.
+  rel="${p#"$probe"}"
+  case "$(cd "$probe" && pwd -P)$rel" in
+    "$root"/*) ;;
+    *) fail "Refusing to write outside the project root: $p"; exit 1 ;;
+  esac
+}
+
 inject_append_section() {  # inject_append_section <dst> <module-name> <src-file>
   local dst="$1" name="$2" src="$3"
   local start end tmp
@@ -331,13 +372,15 @@ inject_module() {  # inject_module <module-name>
     case "$mode" in
       copy)
         mkdir -p "$(dirname "$dst")"
-        cp "$mdir/$src" "$dst"
+        assert_inside_project "$dst"
+    cp "$mdir/$src" "$dst"
         case "$src" in *.sh) chmod +x "$dst" ;; esac
         ;;
       copy-if-missing)
         if [ ! -f "$dst" ]; then
           mkdir -p "$(dirname "$dst")"
-          cp "$mdir/$src" "$dst"
+          assert_inside_project "$dst"
+    cp "$mdir/$src" "$dst"
         fi
         ;;
       append-section)
@@ -477,6 +520,15 @@ if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
 fi
 if [ "$AUDIT_LEVEL" != "basic" ]; then
   info "Audit level: $AUDIT_LEVEL"
+fi
+
+# ── Wekan credentials gitignore ─────────────────────────
+if [ -f "harness/wekan.json" ]; then
+  CRED_FILE="$(sed -n 's/^[[:space:]]*"credentials_file"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/wekan.json)"
+  if [ -n "$CRED_FILE" ] && { [ ! -f .gitignore ] || ! grep -qxF "$CRED_FILE" .gitignore; }; then
+    printf '\n# Wekan API credentials (wekan-tickets) — never commit\n%s\n' "$CRED_FILE" >> .gitignore
+    info "Gitignored $CRED_FILE (Wekan credentials)"
+  fi
 fi
 
 # ── Validation ─────────────────────────────────────────

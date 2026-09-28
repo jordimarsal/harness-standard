@@ -47,8 +47,10 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "Fetching harness-standard ($REF)..."
-if ! git clone --depth 1 --branch "$REF" --quiet "$REPO_URL" "$TMP/harness-standard" 2>/dev/null; then
-  git clone --depth 1 --quiet "$REPO_URL" "$TMP/harness-standard"
+if ! git clone --depth 1 --branch "$REF" --quiet "$REPO_URL" "$TMP/harness-standard"; then
+  echo "install.sh: unable to resolve ref '$REF' in $REPO_URL" >&2
+  echo "install.sh: refusing to fall back to the default branch; pass a valid --ref." >&2
+  exit 1
 fi
 
 ARGS=()

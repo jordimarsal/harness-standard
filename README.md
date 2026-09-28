@@ -45,6 +45,11 @@ TypeScript · Node.js · Java · Python · Android · Rust · Generic — 7 stac
 ## Uninstall
 
 ```bash
-rm -rf CLAUDE.md AGENTS.md opencode.json .claude .opencode harness \
-       docs/architecture.md docs/conventions.md docs/specs.md docs/verification.md
+# 1. Remove harness-managed templates (safe: keeps your docs and all harness state).
+rm -rf CLAUDE.md AGENTS.md opencode.json .claude .opencode HARNESS.md \
+       docs/specs.md docs/verification.md \
+       docs/architecture-options.md docs/iteration-protocol.md
+
+# 2. OPTIONAL and destructive — only if this project no longer needs them.
+# rm -rf harness docs/architecture.md docs/conventions.md
 ```

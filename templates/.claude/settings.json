@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "harness/init.sh > /tmp/harness_init.log 2>&1 && echo '[harness] init.sh OK' || (echo '[harness] init.sh FAILED — check /tmp/harness_init.log before closing' && tail -20 /tmp/harness_init.log)",
+            "command": "LOG=$(mktemp \"${TMPDIR:-/tmp}/harness_init.XXXXXX\") && harness/init.sh > \"$LOG\" 2>&1 && echo \"[harness] init.sh OK ($LOG)\" || (echo \"[harness] init.sh FAILED - check $LOG before closing\" && tail -20 \"$LOG\")",
             "description": "Before closing the session, force a full verification."
           }
         ]

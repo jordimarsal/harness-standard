@@ -59,7 +59,7 @@ pending → [spec-author] → spec_ready → ⏈ HUMAN → in_progress → [impl
 4. Once approved, the leader changes status to `in_progress` and dispatches `implementer`.
 5. The implementer executes `tasks.md` one by one, marking them `[x]`.
 6. The reviewer verifies traceability `R<n>` ↔ test and task completion; approves or rejects.
-7. If approved, the implementer marks `done` and moves the summary to `harness/progress/history.md`.
+7. The human reviewer confirms the Completion Gate (`docs/specs.md`). Only after that explicit human approval does the implementer create `harness/specs/<name>/APPROVAL` (human, date, gate), change status to `done`, and move the summary to `harness/progress/history.md`.
 
 ### Parallelism
 

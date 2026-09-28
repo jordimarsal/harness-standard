@@ -11,7 +11,7 @@ Exit codes: 0 valid, 1 invalid, 2 usage error.
 
 from __future__ import annotations
 
-import json
+import json, os
 import re
 import sys
 
@@ -102,6 +102,11 @@ def main(argv: list[str]) -> int:
                     err(f"{at}.status", "invalid_enum", f"status must be one of {STATUSES}")
                 elif status == "in_progress":
                     in_progress += 1
+                elif status == "done":
+                    approval = os.path.join("harness", "specs", fname, "APPROVAL")
+                    if not os.path.isfile(approval):
+                        err(f"{at}.status", "missing_approval",
+                            f"feature {fid} is done without a human approval record {approval}")
             if in_progress > 1:
                 err("features", "invariant_I1", f"at most one feature may be in_progress (found {in_progress})")
     elif data is not None:

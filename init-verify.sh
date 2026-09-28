@@ -107,7 +107,7 @@ echo "── 3. Running tests ────────────────�
 # Auto-detect test command based on stack
 TEST_CMD=""
 if [ -f "tsconfig.json" ]; then
-  TEST_CMD="npx vitest run 2>&1"
+  TEST_CMD="npx --no-install vitest run 2>&1"
 elif [ -f "package.json" ]; then
   TEST_CMD="npm test 2>&1"
 elif [ -f "Cargo.toml" ]; then
@@ -130,6 +130,8 @@ if [ -n "$TEST_CMD" ]; then
   fi
 else
   warn "No test framework detected — skipping test run"
+  fail "No test evidence: test step was not performed"
+  EXIT_CODE=1
 fi
 
 echo ""

@@ -36,21 +36,30 @@ def find_requirements(root: Path, feature: str) -> set[str]:
     return {f"R{m}" for m in REQ_RE.findall(req_file.read_text(encoding="utf-8"))}
 
 
-def collect_tables(root: Path) -> tuple[dict[str, list[str]], dict[str, str]]:
-    """Merge every impl_*.md table into {requirement: [test identifiers]} plus status."""
+ATTR_RE = re.compile(r"(?im)^\s*feature\s*:\s*([A-Za-z0-9_-]+)\s*$")
+
+def collect_tables(root: Path, feature: str | None = None) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """Merge only those impl_*.md tables attributed to `feature` (protocol v1.1)."""
     merged: dict[str, list[str]] = {}
     statuses: dict[str, str] = {}
     progress = root / "harness" / "progress"
     if not progress.is_dir():
         return merged, statuses
     for impl in sorted(progress.glob("impl_*.md")):
-        for line in impl.read_text(encoding="utf-8").splitlines():
+        text = impl.read_text(encoding="utf-8")
+        owner = ATTR_RE.search(text)
+        if owner is None:
+            if feature is not None:
+                statuses.setdefault("__unattributed__", impl.name)
+            continue
+        if feature is not None and owner.group(1) != feature:
+            continue
+        for line in text.splitlines():
             m = ROW_RE.match(line)
             if m is None:
                 continue
             req = m.group(1)
             tests = [t for t in re.split(r"[,\s]+", m.group(2).strip()) if t]
-            # first-seen row wins if a requirement appears in multiple tables
             statuses.setdefault(req, m.group(4).strip())
             merged.setdefault(req, [])
             for t in tests:
@@ -60,18 +69,27 @@ def collect_tables(root: Path) -> tuple[dict[str, list[str]], dict[str, str]]:
 
 
 def test_identifier_exists(root: Path, identifier: str) -> bool:
+    import ast
     tests_dir = root / "tests"
     if not tests_dir.is_dir():
         return False
+    ident = identifier.strip()
     for tf in tests_dir.rglob("*.py"):
-        if identifier in tf.name or identifier in tf.read_text(encoding="utf-8", errors="replace"):
+        if tf.stem == ident:
             return True
+        try:
+            tree = ast.parse(tf.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == ident:
+                return True
     return False
 
 
 def check_feature(root: Path, feature: str) -> dict:
     requirements = find_requirements(root, feature)
-    tables, statuses = collect_tables(root)
+    tables, statuses = collect_tables(root, feature)
     gaps: list[dict[str, str]] = []
     covered = 0
     for req in sorted(requirements, key=lambda r: int(r[1:])):

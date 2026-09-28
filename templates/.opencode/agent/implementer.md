@@ -26,7 +26,8 @@ Your job is to implement **exactly one** feature from `harness/feature_list.json
 5. **Verify** by running `harness/init.sh`. If it fails → go back to step 4.
 6. **Traceability**: confirm each `R<n>` is covered by at least one concrete test. Document this in `harness/progress/impl_<name>.md` (map `R<n> → test`).
 7. **Do NOT mark `done` yourself.** Wait for the reviewer.
-8. If the reviewer approves (the leader will tell you in a second invocation): change status to `done` and move the summary to `harness/progress/history.md`.
+8. **Do NOT mark `done` yourself.** Wait for the reviewer verdict AND an explicit human 'approved for completion' message in this session.
+9. Only after that human message: create the approval record `harness/specs/<name>/APPROVAL` (human, date, gate), then change status to `done` and move the summary to `harness/progress/history.md`.
 
 ## Hard Rules
 
