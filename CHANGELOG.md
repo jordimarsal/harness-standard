@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-10-04
+## v0.3.0 — 2026-10-04
 
 - **Per-language conventions**: `docs/conventions.md` is now assembled from the
   detected stack's language conventions (java, python, typescript, node,
@@ -18,6 +18,8 @@
   marked sections (including the C7 audit checkpoint when no audit module
   remains) and updates `project.modules`. Spec:
   `docs/superpowers/specs/2026-10-04-architectures-language-conventions-modules-design.md`.
+- Fresh installs now default to `v0.3.0` (installer REF pin); `package.json`
+  version aligned to the release.
 
 ## v0.2.0 — 2026-10-04
 
