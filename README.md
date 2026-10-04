@@ -124,3 +124,26 @@ rm -rf CLAUDE.md AGENTS.md opencode.json .claude .opencode HARNESS.md \
 # 2. OPTIONAL and destructive — only if this project no longer needs them.
 # rm -rf harness docs/architecture.md docs/conventions.md
 ```
+
+## Releasing
+
+Maintainer-facing: how a version ships.
+
+1. Move the `Unreleased` section of `CHANGELOG.md` under a `## vX.Y.Z — date`
+   heading.
+2. Bump the installer REF pin in `install.sh` and the version in
+   `package.json`; commit as `chore(release): vX.Y.Z` and push.
+3. Tag and push the tag:
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z — one-line summary" && git push origin vX.Y.Z
+   ```
+4. Publish the GitHub release with the CHANGELOG section as notes:
+   ```bash
+   awk -v ver="vX.Y.Z" '$0 ~ "^## "ver {f=1; next} /^## / && f {exit} f' \
+     CHANGELOG.md > /tmp/notes.md
+   gh release create vX.Y.Z --verify-tag --latest \
+     --title "vX.Y.Z — one-line summary" --notes-file /tmp/notes.md
+   ```
+
+A pushed tag alone is not visible on the Releases page — step 4 is what
+publishes it. `--ref=latest` and `--update` resolve tags either way.

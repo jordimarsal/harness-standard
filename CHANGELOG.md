@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — 2026-10-04
+
+- **README**: new maintainer-facing "Releasing" section — the four-step
+  release ritual (CHANGELOG heading, REF/package.json bump + commit, annotated
+  tag, `gh release create` from the CHANGELOG section). A pushed tag alone
+  never shows on the Releases page.
+
 ## v0.3.0 — 2026-10-04
 
 - **Per-language conventions**: `docs/conventions.md` is now assembled from the
