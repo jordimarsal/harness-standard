@@ -81,6 +81,22 @@ When dispatching subagents, instruct them to **write results to files** (not in 
 | Complex (refactor)   | 2-3 explorers → 1 spec-author → ⏈ → 1 implementer → 1 reviewer |
 | Very complex         | Split into sub-tasks and re-apply this table                   |
 
+## Implementer batch sizing — one dispatch = one batch
+
+Never hand a whole feature to a single implementer dispatch. Dispatch one batch at a time:
+
+| Batch | When |
+|---|---|
+| 2–3 tasks | default: one coherent unit (a change + its tests) |
+| 1 task | a single large task (migration + repository + test suite) |
+| 4 tasks | only when the tasks are small clones (e.g. four similar adapters) |
+| 5+ tasks | never — oversized batches stall and return nothing written |
+
+- The dispatch prompt carries the batch and nothing else: the task ids (e.g. `T8–T11`), the first file to create, and the gates to reach. Do not re-explain the protocol — it lives in the subagent's system prompt.
+- After every batch, verify **on disk** before dispatching the next one: tasks marked `[x]`, files actually present, gates run (run them yourself). A chat claim is not evidence.
+- Empty reply or missing files → the batch stalled: re-dispatch the **same** batch opened with `Nothing was written: <missing paths>. Create <first file> now.` Two stalls in a row → start a fresh subagent session for that batch.
+- Start a fresh session once the previous one approaches its context limit (~70% of the window): a session that fills its context stops working silently.
+
 ## What You NEVER Do
 
 - ❌ Edit files in `src/` or `tests/`.

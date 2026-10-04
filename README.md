@@ -27,8 +27,10 @@ defaults: tool `claude`, no optional modules, audit level `basic`.
 
 - **Leader** — orchestrates, stops at the human approval gate.
 - **Spec Author** — writes `requirements.md` / `design.md` / `tasks.md`.
-- **Implementer** — builds task by task, tests first.
-- **Reviewer** — checks requirement traceability before `done`.
+- **Implementer** — builds one batch at a time (2–4 tasks: a change plus its
+  tests), gates green after every task, tests first.
+- **Reviewer** — checks requirement traceability before `done`; runs every
+  command itself instead of trusting the implementer's claims.
 - Plus `docs/` (specs, architecture, conventions, verification) and `harness/`
   (feature list, checkpoints, progress, gates).
 

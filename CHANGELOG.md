@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — 2026-10-02
+
+- **Batch discipline** in the subagent prompts: the implementer is dispatched
+  **2–4 consecutive tasks per batch** (1 when a single task is large, 4 only for
+  small clones, never 5+), never a whole feature. It writes files before any
+  prose, runs the quality gates after every task, only then marks `[x]`, and
+  answers with one line `done <batch> -> harness/progress/impl_<name>.md`
+  pointing at a file that exists (created on the first batch if missing).
+- **Leader**: new *implementer batch sizing* table (2–3 default / 1 large / 4
+  clones / never 5+), on-disk verification after every batch instead of trusting
+  chat claims, stall recovery (`Nothing was written: … Create <first file> now.`)
+  and a fresh-session rule once a session nears its context limit — a session
+  that fills its context stops working silently and returns nothing.
+- **Spec author**: sizes each `T<n>` so batches of 2–4 land green on their own.
+- **Reviewer**: states that it executes every command itself, reads test bodies
+  (an import-only test covers nothing), and reviews the whole feature in one
+  pass — batches are an implementer-side discipline.
+- Applied to all four roles in both flavors (`templates/.opencode/agent/` and
+  `templates/.claude/agents/`); the installed copies in an existing project
+  need the same edit (the installer only writes on install).
+
 ## v0.1.1 — 2026-09-24
 
 - Non-interactive installs are silent: with no TTY (curl pipes, CI, `</dev/null`)

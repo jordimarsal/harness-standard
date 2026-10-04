@@ -43,6 +43,12 @@ Read `"audit_level"` from the `project` section of `harness/feature_list.json`
 
 Checkpoint **C7** in `harness/CHECKPOINTS.md` (when present) reflects these rules.
 
+## How you verify
+
+- Run every command yourself; never accept the implementer's chat claims. A file, test or gate that `harness/progress/impl_<name>.md` references but that you cannot find or run on disk is a defect.
+- Read the test bodies. A test that only imports a symbol, or asserts nothing, does not cover its `R<n>` — reject on that.
+- You review the **whole feature in one pass**, not in batches; batches are an implementer-side discipline.
+
 ## Verdict Format
 
 Your final output is **one block** written to `harness/progress/review_<name>.md`:

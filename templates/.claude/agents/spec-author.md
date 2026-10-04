@@ -54,6 +54,15 @@ Conditional capabilities (active only when the module is installed):
   this feature are ALSO copied to `harness/decisions/<feature>-<slug>.md`
   (one ADR per file, immutable, based on `_template.md`).
 
+## Task sizing — feeds implementer batches
+
+The implementer receives 2–4 tasks per dispatch (one batch). Size every `T<n>` accordingly:
+
+- One task = one coherent change **plus** the tests that verify it.
+- Two to four consecutive tasks must form a batch that lands with green gates on its own; no batch may need 5+ tasks to reach a working state.
+- Split any task that would produce more than ~400 lines or span unrelated layers — a batch that cannot finish in one session is a batch that stalls.
+- Keep `depends_on` chains shallow: batch n+1 must be startable from the files batch n leaves behind.
+
 ## Hard Rules
 
 - ❌ NEVER edit `src/` or `tests/`.
