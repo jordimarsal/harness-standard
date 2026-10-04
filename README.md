@@ -1,6 +1,7 @@
 # Harness Standard
 
 [![CI](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml)
+[![built with harness-standard](assets/badge.svg)](https://github.com/jordimarsal/harness-standard)
 
 Install a repeatable process for coding agents in one command.
 
@@ -104,6 +105,33 @@ menu:
 
 `jordimp.net` is built with this harness. Its own repo is the reference install:
 https://jordimp.net
+
+## Badge
+
+The brand badge is `assets/badge.svg` — terminal-style: traffic lights, mono
+type, prompt green on near-black.
+
+In a GitHub README of a project built with the harness:
+
+```markdown
+[![built with harness-standard](assets/badge.svg)](https://github.com/jordimarsal/harness-standard)
+```
+
+From a different repository, use the raw URL:
+
+```markdown
+[![built with harness-standard](https://raw.githubusercontent.com/jordimarsal/harness-standard/main/assets/badge.svg)](https://github.com/jordimarsal/harness-standard)
+```
+
+On a website (e.g. a footer), copy the SVG into the site — first-party, no
+hotlinking — and wrap it in the same link:
+
+```html
+<a href="https://github.com/jordimarsal/harness-standard" rel="noopener">
+  <img src="/assets/badge-harness.svg" alt="built with harness-standard"
+       width="210" height="20">
+</a>
+```
 
 Badge contract: any "built with harness-standard" badge must link
 [github.com/jordimarsal/harness-standard](https://github.com/jordimarsal/harness-standard) and use the install string above verbatim.
