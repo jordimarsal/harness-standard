@@ -81,6 +81,54 @@ value. At minimum, verify the return type and at least one expected property.
 No feature may be marked as `done` unless `harness/init.sh` completes successfully. This is
 the final gate. If `harness/init.sh` fails for any reason, the feature remains `in_progress`.
 
+### Trusting a subagent's "done" claim
+
+A chat reply is not evidence. After **every** implementer batch, verify on disk before
+dispatching the next one:
+
+- the batch's tasks are marked `[x]` in `harness/specs/<name>/tasks.md`;
+- the files it claims to have created really exist and are not empty shells;
+- you run the gates yourself: `uv run ruff check .`, `uv run black --check .`,
+  `uv run mypy`, `uv run pytest tests`.
+
+A reply `done … -> <file>` whose file does not exist has actually happened (twice):
+re-dispatch the same batch opened with `Nothing was written: <missing paths>. Create
+<first file> now.`
+
+### Reading the test count
+
+`pyproject.toml` sets `addopts = "-q"`, so adding your own `-q` yields `-qq`, which
+**hides the summary line** — you get only dots and no total. Always run:
+
+```
+uv run pytest tests        # last line: "486 passed, 1 warning in 4.09s"
+```
+
+and read `N passed`. A row of dots with no `F`/`E` is a pass, not a summary.
+`tests/unit/tooling/test_quality_gates.py::test_R1_quality_gates_pass` fails whenever
+`ruff` does, so a lint error also surfaces as a failed test.
+
+---
+
+## Security Audit Checklist
+
+Read `"audit_level"` from `harness/feature_list.json` (`basic` → confirm each item
+manually and record the confirmation in the review file). This project is a
+single-user localhost app with **security explicitly out of scope** (no auth, no
+users) — the checklist below is therefore minimal and static-analysis oriented:
+
+- [ ] No secrets, API keys, tokens or credentials committed (search for common key
+      patterns; provider configuration lives outside the repo).
+- [ ] No authentication/authorization/session code was added (out of scope by
+      `docs/architecture.md` — its presence would be a spec deviation, not a feature).
+- [ ] The API binds to localhost only; no deployment/hosting configuration was added.
+- [ ] SQLite access uses parameterized queries everywhere (no string-built SQL).
+- [ ] Scraped/API payloads are parsed into typed values only — never executed,
+      never rendered as raw HTML without escaping.
+- [ ] No `eval`/`exec`/`pickle` of external input anywhere under `src/` or `web/src`.
+- [ ] Dependencies come from the official registries via `uv`/`npm` lockfiles; no
+      vendored binaries, no `curl | sh` in scripts.
+
 ---
 
 ## Final Verification

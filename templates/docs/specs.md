@@ -167,8 +167,14 @@ The task list breaks the design into discrete, ordered implementation steps. For
 Rules:
 
 - Each task is a single discrete step that can be completed and verified independently.
+- **Size for batches**: the implementer receives 2–4 consecutive tasks per dispatch.
+  One task = one coherent change **plus** the tests that verify it, and every 2–4
+  consecutive tasks must form a batch that lands with green gates on its own. Split
+  any task that would create more than ~400 lines or span unrelated layers — a batch
+  that cannot finish in one session is a batch that stalls.
 - `depends_on` lists the task IDs that must be completed first. Use `(none)` for tasks
-  with no dependencies.
+  with no dependencies. Keep chains shallow: batch n+1 must be startable from the
+  files batch n leaves behind.
 - `refs` lists the requirement IDs (R\<n\>) that this task contributes to satisfying.
   Every R\<n\> must be referenced by at least one task.
 
