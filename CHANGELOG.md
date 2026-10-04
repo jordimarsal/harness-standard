@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased — 2026-10-02
+## Unreleased — 2026-10-04
 
+- **Log archiving** (token-cost discipline): command output over ~20 lines
+  (tests, builds, failing gates) goes to `harness/logs/<feature>/T<n>.log`;
+  chat and progress files keep only the path plus a short excerpt. The
+  reviewer reads big logs surgically (`grep -n`, `sed -n`) instead of
+  end-to-end; the leader never pastes outputs into dispatch prompts.
 - **Batch discipline** in the subagent prompts: the implementer is dispatched
   **2–4 consecutive tasks per batch** (1 when a single task is large, 4 only for
   small clones, never 5+), never a whole feature. It writes files before any

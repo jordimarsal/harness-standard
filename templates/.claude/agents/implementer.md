@@ -29,6 +29,7 @@ You are dispatched **one batch at a time**, never a whole feature.
 3. After **every** task run the quality gates from `docs/conventions.md` plus that task's test node; only then mark `- [x] T<n>` in `tasks.md`.
 4. Never claim a result you have not executed. If you did not run the gates, the batch is not done.
 5. If the leader writes `Nothing was written: <paths>. Create <first file> now.` the batch has stalled: comply immediately, first file first, no explanation.
+6. **Big outputs go to disk, not chat.** Any command output longer than ~20 lines (test runs, builds, failing gates) is written to `harness/logs/<feature>/T<n>.log`; chat and `harness/progress/` keep only the path and the last ~15 lines. Re-run the command instead of re-pasting an old log.
 
 ## Protocol
 

@@ -32,7 +32,7 @@ defaults: tool `claude`, no optional modules, audit level `basic`.
 - **Reviewer** — checks requirement traceability before `done`; runs every
   command itself instead of trusting the implementer's claims.
 - Plus `docs/` (specs, architecture, conventions, verification) and `harness/`
-  (feature list, checkpoints, progress, gates).
+  (feature list, checkpoints, progress, logs, gates).
 
 ## This website is built with it
 

@@ -435,7 +435,7 @@ if [ ! -f "docs/conventions.md" ]; then
 fi
 
 # Everything else groups under harness/
-mkdir -p harness/progress harness/specs
+mkdir -p harness/progress harness/specs harness/logs
 mkdir -p harness/tools
 cp "$TEMPLATES_DIR/tools/validate-feature-list.py" ./harness/tools/
 chmod +x ./harness/tools/validate-feature-list.py
@@ -585,6 +585,7 @@ check_file "docs/conventions.md"
 check_file "docs/specs.md"
 check_file "docs/verification.md"
 check_dir "harness/specs"
+check_dir "harness/logs"
 
 for m in "${MODULES_SELECTED[@]:+${MODULES_SELECTED[@]}}"; do
   while IFS= read -r vpath; do
