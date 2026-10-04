@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="20" role="img" aria-label="built with harness-standard">
+  <title>built with harness-standard</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/>
+    <stop offset="1" stop-opacity=".2"/>
+  </linearGradient>
+  <clipPath id="r">
+    <rect width="210" height="20" rx="3" fill="#fff"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="96" height="20" fill="#EAE7DF"/>
+    <rect x="96" width="114" height="20" fill="#FBFAF6"/>
+    <rect width="210" height="20" fill="url(#s)"/>
+  </g>
+  <circle cx="9" cy="10" r="2.4" fill="#1A7F37"/>
+  <circle cx="16" cy="10" r="2.4" fill="#9A6700"/>
+  <circle cx="23" cy="10" r="2.4" fill="#CF222E"/>
+  <line x1="96" y1="1" x2="96" y2="19" stroke="#D9D5CB"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace">
+    <text x="31" y="13.5" font-size="9.5" fill="#6E6A5E">built with</text>
+    <text x="103" y="14" font-size="10.5" font-weight="600" fill="#1A7F37">harness-standard</text>
+  </g>
+</svg>

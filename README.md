@@ -108,8 +108,9 @@ https://jordimp.net
 
 ## Badge
 
-The brand badge is `assets/badge.svg` — terminal-style: traffic lights, mono
-type, prompt green on near-black.
+The brand badge ships in two variants: `assets/badge.svg` (dark — traffic
+lights, prompt green on near-black) and `assets/badge-light.svg` (warm light —
+for light-themed sites). Sites that toggle themes swap them by CSS.
 
 In a GitHub README of a project built with the harness:
 
@@ -123,14 +124,23 @@ From a different repository, use the raw URL:
 [![built with harness-standard](https://raw.githubusercontent.com/jordimarsal/harness-standard/main/assets/badge.svg)](https://github.com/jordimarsal/harness-standard)
 ```
 
-On a website (e.g. a footer), copy the SVG into the site — first-party, no
-hotlinking — and wrap it in the same link:
+On a website (e.g. a footer), copy the SVGs into the site — first-party, no
+hotlinking — and wrap them in the same link. Theme-adaptive pattern:
 
 ```html
 <a href="https://github.com/jordimarsal/harness-standard" rel="noopener">
-  <img src="/assets/badge-harness.svg" alt="built with harness-standard"
-       width="210" height="20">
+  <img src="/assets/badge-light.svg" alt="built with harness-standard"
+       width="210" height="20" class="badge-light">
+  <img src="/assets/badge.svg" alt="" aria-hidden="true"
+       width="210" height="20" class="badge-dark">
 </a>
+<style>
+  .badge-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    .badge-light { display: none; }
+    .badge-dark { display: inline; }
+  }
+</style>
 ```
 
 Badge contract: any "built with harness-standard" badge must link
