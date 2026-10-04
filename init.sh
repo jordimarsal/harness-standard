@@ -384,7 +384,7 @@ if [ -z "$ARCH_FLAG" ] && is_interactive && [ "$UPDATE" -eq 0 ]; then
   _ai=1
   for _a in "${ARCHITECTURES_AVAILABLE[@]:+${ARCHITECTURES_AVAILABLE[@]}}"; do
     printf "  %d) %s\n" "$_ai" "$_a"
-    ARCH_MAP[$_ai]="$_a"
+    ARCH_MAP[_ai]="$_a"
     _ai=$((_ai + 1))
   done
   printf "Select architecture (number, Enter = skip): "
