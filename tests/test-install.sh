@@ -231,7 +231,7 @@ test_interactive_module_menu() {
   local t3="interactive audit level prompt accepts standard"
   run_test "$t3"
   d=$(new_project "interactive-audit")
-  (cd "$d" && printf 'o\n\n2\n' | HARNESS_FORCE_TTY=1 "$INIT" >/dev/null) || {
+  (cd "$d" && printf 'o\n\n\n2\n' | HARNESS_FORCE_TTY=1 "$INIT" >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t3: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -1127,6 +1127,77 @@ test_remote_update() {
   assert_file "$t" "$d/HARNESS.md"
 }
 
+test_architecture_selection() {
+  local t="--architecture selects templates, records the choice, rejects unknown names"
+  run_test "$t"
+  local d; d=$(new_project "arch-sel")
+  touch "$d/requirements.txt"
+  (cd "$d" && "$INIT" --tool=claude --architecture=hexagonal >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "Hexagonal" "$d/docs/architecture.md"
+  assert_grep "$t" "harness:module:architecture:start" "$d/docs/conventions.md"
+  assert_grep "$t" '"architecture": "hexagonal"' "$d/harness/feature_list.json"
+  assert_grep "$t" "pytest with fixtures" "$d/docs/conventions.md"
+  local d2; d2=$(new_project "arch-bad")
+  if (cd "$d2" && "$INIT" --tool=claude --architecture=nope >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: unknown architecture accepted")
+    echo "    FAIL: --architecture=nope must be rejected"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
+test_update_modules_and_docs() {
+  local t="--update: add/remove modules over time; customized docs preserved"
+  run_test "$t"
+  local d; d=$(new_project "mod-evolve")
+  (cd "$d" && "$INIT" --tool=opencode --modules=decision-memory >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: initial install failed"); return
+  }
+  PASS=$((PASS + 1))
+  local before after
+  before="$(md5sum "$d/docs/conventions.md" | cut -d' ' -f1)"
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: plain update failed"); return
+  }
+  after="$(md5sum "$d/docs/conventions.md" | cut -d' ' -f1)"
+  if [ "$before" = "$after" ]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: generated conventions changed on plain update")
+    echo "    FAIL: self-heal must keep generated content stable"
+  fi
+  (cd "$d" && "$INIT" --update --add-modules=log-reader >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: add-modules failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/docs/log-reader-protocol.md"
+  assert_grep "$t" '"log-reader"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"decision-memory"' "$d/harness/feature_list.json"
+  echo "my custom rule" >> "$d/docs/conventions.md"
+  (cd "$d" && "$INIT" --update --architecture=clean >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: architecture switch failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "my custom rule" "$d/docs/conventions.md"
+  assert_grep "$t" "harness:module:architecture:start" "$d/docs/conventions.md"
+  assert_grep "$t" "Clean" "$d/docs/architecture.md"
+  (cd "$d" && "$INIT" --update --remove-modules=log-reader >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: remove-modules failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_no_file "$t" "$d/docs/log-reader-protocol.md"
+  assert_grep "$t" '"decision-memory"' "$d/harness/feature_list.json"
+  if grep -q '"log-reader"' "$d/harness/feature_list.json"; then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: removed module still recorded")
+    echo "    FAIL: log-reader must be gone from feature_list.json"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
 test_non_tty_no_prompts() {
   local t="non-TTY stdin installs with defaults and prints no menus"
   run_test "$t"
@@ -1200,6 +1271,8 @@ test_remote_install
 test_update_requires_harness
 test_update_flow
 test_remote_update
+test_architecture_selection
+test_update_modules_and_docs
 test_non_tty_no_prompts
 test_force_switch_modules_metadata
 

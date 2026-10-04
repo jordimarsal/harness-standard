@@ -23,6 +23,11 @@ writes `HARNESS.md` into your repo with the next step.
 Requires `git`. Non-interactive installs (CI, pipes) skip the prompts and use
 defaults: tool `claude`, no optional modules, audit level `basic`.
 
+Pick the architecture up front with `--architecture=hexagonal` (or `layered`,
+`clean`, `cqrs`, `microservices`, `modular-monolith`, `event-driven`) — or
+choose from the menu on an interactive terminal; otherwise a generic template
+is installed. On a TTY the installer also asks.
+
 ## Update
 
 Already installed? Re-run the installer with `--update`. It detects the
@@ -39,6 +44,22 @@ Without `--ref`, `--update` fetches the newest `v*` tag (fresh installs stay
 pinned to the default version). The installed version is recorded in
 `harness/feature_list.json` (`project.harness_version`) and `HARNESS.md`.
 
+Evolve an installed project without retyping anything:
+
+```bash
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --update --add-modules=security-audit
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --update --remove-modules=security-audit
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --update --architecture=hexagonal
+```
+
+`--add-modules` / `--remove-modules` work at any time — added modules install
+their files, removed ones have their files and injected sections stripped.
+`--architecture` switches the architecture template; your own edits to
+`docs/architecture.md` / `docs/conventions.md` are preserved (only the marked
+architecture section is refreshed). Conventions and architecture docs are
+otherwise regenerated on update only when they are still installer-generated;
+anything you edited is left untouched.
+
 ## What gets installed
 
 - **Leader** — orchestrates, stops at the human approval gate.
@@ -47,7 +68,8 @@ pinned to the default version). The installed version is recorded in
   tests), gates green after every task, tests first.
 - **Reviewer** — checks requirement traceability before `done`; runs every
   command itself instead of trusting the implementer's claims.
-- Plus `docs/` (specs, architecture, conventions, verification) and `harness/`
+- Plus `docs/` (specs, architecture, conventions — generated for your stack
+  and chosen architecture, verification) and `harness/`
   (feature list, checkpoints, progress, logs, gates).
 
 ## Cost discipline

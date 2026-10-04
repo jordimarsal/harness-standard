@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — 2026-10-04
+
+- **Per-language conventions**: `docs/conventions.md` is now assembled from the
+  detected stack's language conventions (java, python, typescript, node,
+  android, rust, generic) — the old frame shipped Java rules to every stack.
+  The universal frame stays single-source; language sections are
+  marker-delimited chunks.
+- **Selectable architectures**: `--architecture=<name>` (layered, hexagonal,
+  clean, cqrs, microservices, modular-monolith, event-driven — the directory
+  is the catalog) renders `docs/architecture.md` and injects an
+  architecture conventions section into `docs/conventions.md`; recorded in
+  `project.architecture`. Interactive picker at fresh install on a TTY.
+  Installer-generated docs self-heal on update; edited docs are untouched.
+- **Modules at any time**: `--update --add-modules=a,b` and
+  `--update --remove-modules=a,b` — removal deletes copied files, strips
+  marked sections (including the C7 audit checkpoint when no audit module
+  remains) and updates `project.modules`. Spec:
+  `docs/superpowers/specs/2026-10-04-architectures-language-conventions-modules-design.md`.
+
 ## v0.2.0 — 2026-10-04
 
 - **Log archiving** (token-cost discipline): command output over ~20 lines

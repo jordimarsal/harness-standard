@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
 #
-# Destination layout:
-#   - Entry point (CLAUDE.md or AGENTS.md) at the project root
-#   - Tool directory (.claude/ or .opencode/) at the project root
-#   - docs/ at the project root
-#   - Everything else grouped under harness/
+# Conventions and architecture docs:
+#   docs/conventions.md is generated from the detected stack's language
+#   conventions plus the chosen architecture section; docs/architecture.md is
+#   the chosen architecture's template (--architecture=<name>, or interactive
+#   on a TTY at install). Existing files are regenerated only when
+#   installer-generated (byte-identical) or when --architecture is given.
 #
 # Safe: refuses to overwrite an existing harness. Use --force to reinstall:
 # it refreshes templates but preserves user state (harness/feature_list.json,
 # harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md).
+# Use --update instead: it reuses the stored tool/modules/audit configuration,
+# never drops modules, and can add (--add-modules) or remove (--remove-modules)
+# modules at any time.
 
 set -euo pipefail
 
@@ -59,6 +63,10 @@ FORCE=0
 UPDATE=0
 FORCE_SOURCE=""
 MODULES_FLAG=""
+ADD_MODULES_FLAG=""
+REMOVE_MODULES_FLAG=""
+ARCH_FLAG=""
+REMOVED_MODULES=()
 AUDIT_LEVEL=""
 for arg in "$@"; do
   case "$arg" in
@@ -67,14 +75,22 @@ for arg in "$@"; do
     --force) FORCE=1 ;;
     --update) UPDATE=1 ;;
     --modules=*)     MODULES_FLAG="${arg#--modules=}" ;;
+    --add-modules=*) ADD_MODULES_FLAG="${arg#--add-modules=}" ;;
+    --remove-modules=*) REMOVE_MODULES_FLAG="${arg#--remove-modules=}" ;;
+    --architecture=*) ARCH_FLAG="${arg#--architecture=}" ;;
     --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]"
       exit 1
       ;;
   esac
 done
+
+if { [ -n "$ADD_MODULES_FLAG" ] || [ -n "$REMOVE_MODULES_FLAG" ]; } && [ "$UPDATE" -eq 0 ]; then
+  fail "--add-modules/--remove-modules require --update."
+  exit 1
+fi
 
 if [ "$FORCE" -eq 1 ] && [ "$UPDATE" -eq 1 ]; then
   fail "Use --update or --force, not both."
@@ -116,6 +132,41 @@ if [ "$UPDATE" -eq 1 ]; then
     if [ -n "$MODULES_FLAG" ]; then
       info "Update: re-applying stored modules: $(printf '%s' "$MODULES_FLAG" | tr ',' ' ')"
     fi
+  fi
+  if [ -n "$ADD_MODULES_FLAG" ] || [ -n "$REMOVE_MODULES_FLAG" ]; then
+    MOD_LIST=()
+    if [ -n "$MODULES_FLAG" ]; then
+      IFS=',' read -ra _parts <<< "$MODULES_FLAG"
+      for _p in "${_parts[@]}"; do
+        _p="$(printf '%s' "$_p" | tr -d '[:space:]')"
+        [ -n "$_p" ] && MOD_LIST+=("$_p")
+      done
+    fi
+    if [ -n "$ADD_MODULES_FLAG" ]; then
+      IFS=',' read -ra _parts <<< "$ADD_MODULES_FLAG"
+      for _p in "${_parts[@]}"; do
+        _p="$(printf '%s' "$_p" | tr -d '[:space:]')"
+        [ -z "$_p" ] && continue
+        _dup=0
+        for _e in "${MOD_LIST[@]:+${MOD_LIST[@]}}"; do [ "$_e" = "$_p" ] && _dup=1; done
+        [ "$_dup" -eq 0 ] && MOD_LIST+=("$_p")
+      done
+    fi
+    REMOVED_MODULES=()
+    if [ -n "$REMOVE_MODULES_FLAG" ]; then
+      IFS=',' read -ra _parts <<< "$REMOVE_MODULES_FLAG"
+      _keep=()
+      for _e in "${MOD_LIST[@]:+${MOD_LIST[@]}}"; do
+        _drop=0
+        for _p in "${_parts[@]}"; do
+          _p="$(printf '%s' "$_p" | tr -d '[:space:]')"
+          [ "$_e" = "$_p" ] && _drop=1
+        done
+        if [ "$_drop" -eq 1 ]; then REMOVED_MODULES+=("$_e"); else _keep+=("$_e"); fi
+      done
+      MOD_LIST=("${_keep[@]:+${_keep[@]}}")
+    fi
+    MODULES_FLAG="$(IFS=,; printf '%s' "${MOD_LIST[*]}")"
   fi
   if [ -z "$AUDIT_LEVEL" ]; then
     AUDIT_LEVEL="$(sed -n 's/.*"audit_level"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/feature_list.json | head -n 1)"
@@ -251,6 +302,24 @@ for mdir in "$TEMPLATES_DIR/modules"/*/; do
   MODULES_AVAILABLE+=("$(basename "$mdir")")
 done
 
+# Selectable architectures: the directory is the catalog.
+ARCHITECTURES_AVAILABLE=()
+for adir in "$TEMPLATES_DIR/architectures"/*/; do
+  [ -f "$adir/architecture.md" ] || continue
+  ARCHITECTURES_AVAILABLE+=("$(basename "$adir")")
+done
+if [ -n "$ARCH_FLAG" ]; then
+  _known=0
+  for _a in "${ARCHITECTURES_AVAILABLE[@]:+${ARCHITECTURES_AVAILABLE[@]}}"; do
+    [ "$_a" = "$ARCH_FLAG" ] && _known=1
+  done
+  if [ "$_known" -eq 0 ]; then
+    fail "Unknown architecture: $ARCH_FLAG"
+    fail "Available: ${ARCHITECTURES_AVAILABLE[*]:-none}"
+    exit 1
+  fi
+fi
+
 if [ -n "$MODULES_FLAG" ]; then
   IFS=',' read -ra requested <<< "$MODULES_FLAG"
   for m in "${requested[@]}"; do
@@ -304,6 +373,29 @@ else
     fi
   else
     info "No TTY detected — no optional modules installed. Pass --modules=m1,m2 to select."
+  fi
+fi
+
+# Architecture picker (fresh installs on a TTY; --update uses --architecture=).
+ARCH_MAP=()
+if [ -z "$ARCH_FLAG" ] && is_interactive && [ "$UPDATE" -eq 0 ]; then
+  echo ""
+  echo "Architecture for docs/architecture.md (Enter = generic template):"
+  _ai=1
+  for _a in "${ARCHITECTURES_AVAILABLE[@]:+${ARCHITECTURES_AVAILABLE[@]}}"; do
+    printf "  %d) %s\n" "$_ai" "$_a"
+    ARCH_MAP[$_ai]="$_a"
+    _ai=$((_ai + 1))
+  done
+  printf "Select architecture (number, Enter = skip): "
+  read -r answer || answer=""
+  if [ -n "$answer" ]; then
+    _pick="${ARCH_MAP[$answer]:-}"
+    if [ -n "$_pick" ]; then
+      ARCH_FLAG="$_pick"
+    else
+      warn "Ignoring invalid architecture number: $answer"
+    fi
   fi
 fi
 
@@ -464,6 +556,72 @@ inject_module() {  # inject_module <module-name>
   done < <(manifest_injects "$mdir/manifest.json")
 }
 
+strip_module() {  # strip_module <module-name> — uninstall the files a module injected
+  local m="$1"
+  local mf="$TEMPLATES_DIR/modules/$m/manifest.json"
+  if [ ! -f "$mf" ]; then
+    warn "Cannot uninstall module '$m': its manifest is missing in this harness version — remove its files manually."
+    return
+  fi
+  local line dst mode
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then continue; fi
+    mode=$(printf '%s\n' "$line" | sed -n 's/.*"mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    if printf '%s\n' "$line" | grep -q '"dst"[[:space:]]*:[[:space:]]*{'; then
+      dst=$(printf '%s\n' "$line" | sed -n "s/.*\"$TOOL\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
+    else
+      dst=$(printf '%s\n' "$line" | sed -n 's/.*"dst"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    fi
+    [ -z "$dst" ] && continue
+    case "$mode" in
+      copy|copy-if-missing)
+        if [ -f "$dst" ]; then
+          rm -f "$dst"
+          ok "Removed $dst (module: $m)"
+        fi
+        ;;
+      append-section)
+        if [ -f "$dst" ] && grep -qF "<!-- harness:module:$m:start -->" "$dst"; then
+          awk -v start="<!-- harness:module:$m:start -->" -v end="<!-- harness:module:$m:end -->" '
+            index($0, start) { inblk = 1 }
+            inblk && index($0, end) { inblk = 0; next }
+            !inblk { print }
+          ' "$dst" > "$dst.tmp" && mv "$dst.tmp" "$dst"
+          ok "Stripped module section from $dst (module: $m)"
+        fi
+        ;;
+    esac
+  done < <(manifest_injects "$mf")
+}
+
+generate_conventions() {  # generate_conventions <stack> > stdout — frame + language chunks
+  local stack="$1"
+  awk -v tpl="$TEMPLATES_DIR/docs/conventions.md.tpl" -v conv="$TEMPLATES_DIR/conventions/$stack.md" '
+    function chunk(tag,   f, line, out) {
+      out = ""
+      while ((getline line < conv) > 0) {
+        if (line == "<!-- " tag " -->") { f = 1; continue }
+        if (line == "<!-- /" tag " -->") { f = 0 }
+        if (f) out = out line "\n"
+      }
+      close(conv)
+      return out
+    }
+    BEGIN {
+      while ((getline line < tpl) > 0) {
+        if      (line == "{{STYLE_RULES}}")     printf "%s", chunk("style")
+        else if (line == "{{NAMING_RULES}}")    printf "%s", chunk("naming")
+        else if (line == "{{FILE_STRUCTURE}}")  printf "%s", chunk("structure")
+        else if (line == "{{TEST_RULES}}")      printf "%s", chunk("tests")
+        else if (line == "{{ERROR_HANDLING}}")  printf "%s", chunk("errors")
+        else if (line == "{{QUALITY_SECTION}}") printf "%s", chunk("quality")
+        else print line
+      }
+      close(tpl)
+    }
+  '
+}
+
 refresh_project_metadata() {  # refresh_project_metadata <feature-list>
   # Best-effort: --force records the current run's module/audit selection.
   # The target lines have the exact shape the installer itself writes, so a
@@ -495,20 +653,59 @@ mkdir -p docs
 cp "$TEMPLATES_DIR/docs/specs.md" ./docs/specs.md
 cp "$TEMPLATES_DIR/docs/verification.md" ./docs/verification.md
 
-if [ ! -f "docs/architecture.md" ]; then
+# ── Conventions & architecture docs (stack- and architecture-aware) ──
+ARCH_STORED=""
+if [ -f "harness/feature_list.json" ]; then
+  ARCH_STORED="$(sed -n 's/.*"architecture"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/feature_list.json 2>/dev/null | head -n 1)"
+fi
+ARCH_NAME="${ARCH_FLAG:-$ARCH_STORED}"
+
+CONV_TMP="$(mktemp)"
+generate_conventions "$STACK" > "$CONV_TMP"
+if [ -n "$ARCH_NAME" ] && [ -f "$TEMPLATES_DIR/architectures/$ARCH_NAME/conventions-section.md" ]; then
+  { echo "<!-- harness:module:architecture:start -->"
+    cat "$TEMPLATES_DIR/architectures/$ARCH_NAME/conventions-section.md"
+    echo ""
+    echo "<!-- harness:module:architecture:end -->"
+  } >> "$CONV_TMP"
+fi
+
+if [ ! -f "docs/conventions.md" ]; then
+  mv "$CONV_TMP" docs/conventions.md
+  ok "Conventions generated (stack: $STACK${ARCH_NAME:+, architecture: $ARCH_NAME})"
+elif [ -n "$ARCH_FLAG" ] && cmp -s "$CONV_TMP" docs/conventions.md; then
+  mv "$CONV_TMP" docs/conventions.md
+  ok "Conventions regenerated (stack: $STACK, architecture: $ARCH_NAME)"
+elif [ -n "$ARCH_FLAG" ]; then
+  # Explicit architecture choice: keep user content, refresh only the marked section.
+  rm -f "$CONV_TMP"
+  inject_append_section "docs/conventions.md" "architecture" \
+    "$TEMPLATES_DIR/architectures/$ARCH_NAME/conventions-section.md"
+  ok "Architecture conventions injected into docs/conventions.md ($ARCH_NAME)"
+elif [ "$FORCE" -eq 1 ] && { cmp -s "$CONV_TMP" docs/conventions.md || \
+  grep -q "Define coding style rules here." docs/conventions.md; }; then
+  # Installer-generated content (or untouched placeholder defaults) self-heals.
+  mv "$CONV_TMP" docs/conventions.md
+  ok "Conventions refreshed (was installer-generated)"
+else
+  rm -f "$CONV_TMP"
+  info "docs/conventions.md is customized — left untouched (pass --architecture=<name> to regenerate)"
+fi
+
+if [ -n "$ARCH_NAME" ]; then
+  if [ ! -f "docs/architecture.md" ] || [ -n "$ARCH_FLAG" ] || \
+     cmp -s "$TEMPLATES_DIR/architectures/$ARCH_NAME/architecture.md" docs/architecture.md || \
+     grep -q "Define the architectural principles for this project here." docs/architecture.md; then
+    cp "$TEMPLATES_DIR/architectures/$ARCH_NAME/architecture.md" docs/architecture.md
+    ok "Architecture doc installed: $ARCH_NAME"
+  else
+    info "docs/architecture.md is customized — left untouched"
+  fi
+elif [ ! -f "docs/architecture.md" ]; then
   sed -e "s|{{ARCHITECTURE_PRINCIPLES}}|Define the architectural principles for this project here.|g" \
       -e "s|{{DATA_FLOW}}|Describe the data flow here.|g" \
       -e "s|{{ARCHITECTURE_DONT}}|List what NOT to do here.|g" \
       "$TEMPLATES_DIR/docs/architecture.md.tpl" > docs/architecture.md
-fi
-
-if [ ! -f "docs/conventions.md" ]; then
-  sed -e "s|{{STYLE_RULES}}|Define coding style rules here.|g" \
-      -e "s|{{NAMING_RULES}}|Define naming conventions here.|g" \
-      -e "s|{{FILE_STRUCTURE}}|Define file structure rules here.|g" \
-      -e "s|{{TEST_RULES}}|Define testing rules here.|g" \
-      -e "s|{{ERROR_HANDLING}}|Define error handling rules here.|g" \
-      "$TEMPLATES_DIR/docs/conventions.md.tpl" > docs/conventions.md
 fi
 
 # Everything else groups under harness/
@@ -534,10 +731,21 @@ if [ ! -f "harness/feature_list.json" ]; then
       -e "s|{{MODULES}}|$MODULES_JSON|g" \
       -e "s|{{AUDIT_LEVEL}}|$AUDIT_LEVEL|g" \
       -e "s|{{HARNESS_VERSION}}|$HARNESS_VERSION|g" \
+      -e "s|{{ARCHITECTURE}}|${ARCH_NAME:-}|g" \
       "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
 else
   ok "Keeping existing harness/feature_list.json"
   refresh_project_metadata "harness/feature_list.json"
+fi
+
+if [ -n "$ARCH_NAME" ]; then
+  if grep -q '"architecture"[[:space:]]*:' harness/feature_list.json; then
+    sed "s|\"architecture\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"architecture\": \"$ARCH_NAME\"|" \
+      harness/feature_list.json > harness/feature_list.json.tmp && mv harness/feature_list.json.tmp harness/feature_list.json
+  elif grep -q '"harness_version"[[:space:]]*:' harness/feature_list.json; then
+    sed "s|\"harness_version\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"|\"harness_version\": \"\1\",\n    \"architecture\": \"$ARCH_NAME\"|" \
+      harness/feature_list.json > harness/feature_list.json.tmp && mv harness/feature_list.json.tmp harness/feature_list.json
+  fi
 fi
 
 # Verification script becomes harness/init.sh
@@ -575,6 +783,14 @@ fi
 
 ok "Templates installed"
 
+# ── Uninstall removed modules (--update --remove-modules) ──
+if [ "${#REMOVED_MODULES[@]}" -gt 0 ]; then
+  info "Removing modules: ${REMOVED_MODULES[*]}"
+  for _m in "${REMOVED_MODULES[@]}"; do
+    strip_module "$_m"
+  done
+fi
+
 # ── Inject optional modules ────────────────────────────
 if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
   info "Injecting modules..."
@@ -594,6 +810,17 @@ if [ "${#MODULES_SELECTED[@]}" -gt 0 ]; then
     esac
   done
   info "Modules installed: ${MODULES_SELECTED[*]}"
+fi
+# No audit module left → the C7 audit checkpoint goes too.
+if ! printf '%s\n' "${MODULES_SELECTED[*]:-}" | grep -qE 'security-audit|performance-benchmarks'; then
+  if [ -f "harness/CHECKPOINTS.md" ] && grep -qF "<!-- harness:module:audit-checkpoint:start -->" harness/CHECKPOINTS.md; then
+    awk -v start="<!-- harness:module:audit-checkpoint:start -->" -v end="<!-- harness:module:audit-checkpoint:end -->" '
+      index($0, start) { inblk = 1 }
+      inblk && index($0, end) { inblk = 0; next }
+      !inblk { print }
+    ' harness/CHECKPOINTS.md > harness/CHECKPOINTS.md.tmp && mv harness/CHECKPOINTS.md.tmp harness/CHECKPOINTS.md
+    ok "Removed audit checkpoint (no audit module installed)"
+  fi
 fi
 if [ "$AUDIT_LEVEL" != "basic" ]; then
   info "Audit level: $AUDIT_LEVEL"
@@ -690,6 +917,7 @@ if [ $EXIT_CODE -eq 0 ]; then
 Installed with [harness-standard](https://github.com/jordimarsal/harness-standard) (\`$TOOL\`, \`$HARNESS_VERSION\`).
 
 - **Stack detected:** $STACK
+- **Architecture:** ${ARCH_NAME:-generic template}
 - **Roles:** Leader · Spec Author · Implementer · Reviewer (\`$ROLES_DIR\`)
 - **Gates:** \`harness/CHECKPOINTS.md\` · \`docs/verification.md\`
 - **Process:** \`docs/specs.md\` — Spec-Driven Development with a human approval gate

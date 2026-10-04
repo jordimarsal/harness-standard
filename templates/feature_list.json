@@ -4,7 +4,8 @@
     "parallel": false,
     "modules": [{{MODULES}}],
     "audit_level": "{{AUDIT_LEVEL}}",
-    "harness_version": "{{HARNESS_VERSION}}"
+    "harness_version": "{{HARNESS_VERSION}}",
+    "architecture": "{{ARCHITECTURE}}"
   },
   "features": []
 }
