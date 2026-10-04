@@ -46,7 +46,7 @@ You are dispatched **one batch at a time**, never a whole feature.
 6. **Traceability** (final batch of the feature): confirm each `R<n>` is covered by at least one concrete test. Document this in `harness/progress/impl_<name>.md` (map `R<n> → test`).
 7. **Do NOT mark `done` yourself.** Wait for the reviewer.
 8. **Do NOT mark `done` yourself.** Wait for the reviewer verdict AND an explicit human 'approved for completion' message in this session.
-9. Only after that human message: create the approval record `harness/specs/<name>/APPROVAL` (human, date, gate), then change status to `done` and move the summary to `harness/progress/history.md`.
+9. Only after that human message: create the approval record `harness/specs/<name>/APPROVAL` (human, date, gate), then change status to `done` and move the summary to `harness/progress/history.md`, adding one retro line under it: `retro: <n> dispatches · <s> stalls · <r> restarts` — count what you received for this feature (a stall is a `Nothing was written` re-dispatch; a restart is being re-dispatched in a fresh session).
 
 ## Hard Rules
 

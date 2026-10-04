@@ -12,6 +12,10 @@
   on verification failure it falls back to reading the exact ranges with the
   main model. Installs `docs/log-reader-protocol.md`; leader and reviewer
   pick it up as a conditional capability.
+- **Feature retro line**: when a feature closes, the summary moved to
+  `harness/progress/history.md` carries `retro: <n> dispatches · <s> stalls ·
+  <r> restarts` — the per-feature efficiency record that shows where process
+  friction accumulates.
 - **Batch discipline** in the subagent prompts: the implementer is dispatched
   **2–4 consecutive tasks per batch** (1 when a single task is large, 4 only for
   small clones, never 5+), never a whole feature. It writes files before any
