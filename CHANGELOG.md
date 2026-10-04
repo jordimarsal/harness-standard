@@ -12,6 +12,8 @@
   on verification failure it falls back to reading the exact ranges with the
   main model. Installs `docs/log-reader-protocol.md`; leader and reviewer
   pick it up as a conditional capability.
+- **README**: new "Cost discipline" and "Optional modules" sections; the
+  uninstall snippet now also removes `docs/log-reader-protocol.md`.
 - **Feature retro line**: when a feature closes, the summary moved to
   `harness/progress/history.md` carries `retro: <n> dispatches · <s> stalls ·
   <r> restarts` — the per-feature efficiency record that shows where process
