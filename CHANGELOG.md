@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-10-04
+## v0.2.0 — 2026-10-04
 
 - **Log archiving** (token-cost discipline): command output over ~20 lines
   (tests, builds, failing gates) goes to `harness/logs/<feature>/T<n>.log`;
@@ -22,6 +22,8 @@
   preserving user state. `install.sh --ref=latest` resolves the newest tag;
   `--update` defaults to it. First update-capable release is the one that
   ships this change.
+- Fresh installs now default to `v0.2.0` (installer REF pin); `package.json`
+  version aligned to the release.
 - **Feature retro line**: when a feature closes, the summary moved to
   `harness/progress/history.md` carries `retro: <n> dispatches · <s> stalls ·
   <r> restarts` — the per-feature efficiency record that shows where process

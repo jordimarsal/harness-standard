@@ -1,6 +1,6 @@
 {
   "name": "@jordimp/harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Install the Harness Standard multi-agent SDD process into any repository.",
   "bin": { "harness-init": "bin/init.js" },
   "scripts": { "test": "bash tests/test-install.sh && bash tests/test-security.sh" },
