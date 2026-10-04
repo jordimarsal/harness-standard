@@ -78,6 +78,21 @@ def test_identifier_exists(root: Path, identifier: str) -> bool:
     if not tests_dir.is_dir():
         return False
     ident = identifier.strip()
+    if "::" in ident:
+        # Exact node id `path/to/test_file.py::test_name` — verify both halves.
+        rel, _, name = ident.rpartition("::")
+        tf = root / rel
+        if not tf.is_file():
+            return False
+        try:
+            tree = ast.parse(tf.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            return False
+        return any(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and node.name == name
+            for node in ast.walk(tree)
+        )
     for tf in tests_dir.rglob("*.py"):
         if tf.stem == ident:
             return True
@@ -134,6 +149,22 @@ def check_feature(root: Path, feature: str) -> dict:
     }
 
 
+def _done_features(root: Path) -> set[str]:
+    """Names of features whose status in feature_list.json is `done`."""
+    flist = root / "harness" / "feature_list.json"
+    if not flist.is_file():
+        return set()
+    try:
+        data = json.loads(flist.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return set()
+    return {
+        f["name"]
+        for f in data.get("features", [])
+        if isinstance(f, dict) and f.get("status") == "done"
+    }
+
+
 def main(argv: list[str]) -> int:
     as_json = False
     feature: str | None = None
@@ -176,6 +207,10 @@ def main(argv: list[str]) -> int:
         names = (
             sorted(p.name for p in specs_dir.iterdir() if p.is_dir()) if specs_dir.is_dir() else []
         )
+        # Only `done` features are gated: a spec_ready/in_progress feature has no
+        # implementation table yet, which is not a traceability gap.
+        done = _done_features(root)
+        names = [n for n in names if n in done]
     else:
         names = [feature]
 
