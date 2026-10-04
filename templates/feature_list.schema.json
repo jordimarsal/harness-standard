@@ -13,7 +13,8 @@
         "name": {"type": "string", "minLength": 1},
         "parallel": {"type": "boolean"},
         "modules": {"type": "array", "items": {"type": "string"}},
-        "audit_level": {"enum": ["basic", "standard", "strict"]}
+        "audit_level": {"enum": ["basic", "standard", "strict"]},
+        "harness_version": {"type": "string"}
       }
     },
     "features": {

@@ -3,15 +3,21 @@
 #
 # Usage:
 #   curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=claude
-#   bash install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF] [--force]
+#   bash install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update]
 #                   [--modules=m1,m2] [--audit-level=basic|standard|strict]
 #
+# --update refreshes an installed harness, reusing its stored tool/modules/audit
+# level; without --ref it fetches the newest v* tag (fresh installs stay pinned
+# to the default REF).
+#
 # Env: HARNESS_REPO_URL (default https://github.com/jordimarsal/harness-standard.git)
-#      HARNESS_REF      (default v0.1.0)
+#      HARNESS_REF      (default v0.1.1)
 set -euo pipefail
 
 REPO_URL="${HARNESS_REPO_URL:-https://github.com/jordimarsal/harness-standard.git}"
 REF="${HARNESS_REF:-v0.1.1}"
+REF_GIVEN=0
+UPDATE=0
 DEST="."
 TOOL=""
 PASSTHRU=()
@@ -22,12 +28,13 @@ while [ $# -gt 0 ]; do
     --tool)          shift; TOOL="${1:-}" ;;
     --dest=*)        DEST="${1#*=}" ;;
     --dest)          shift; DEST="${1:-}" ;;
-    --ref=*)         REF="${1#*=}" ;;
-    --ref)           shift; REF="${1:-}" ;;
+    --ref=*)         REF="${1#*=}"; REF_GIVEN=1 ;;
+    --ref)           shift; REF="${1:-}"; REF_GIVEN=1 ;;
     --force)         PASSTHRU+=(--force) ;;
+    --update)        UPDATE=1; PASSTHRU+=(--update) ;;
     --modules=*|--audit-level=*) PASSTHRU+=("$1") ;;
     -h|--help)
-      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF] [--force] [--modules=...] [--audit-level=...]"
+      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update] [--modules=...] [--audit-level=...]"
       exit 0 ;;
     *) echo "install.sh: unknown argument: $1" >&2; exit 1 ;;
   esac
@@ -40,6 +47,16 @@ case "$TOOL" in
 esac
 
 command -v git >/dev/null 2>&1 || { echo "install.sh: git is required" >&2; exit 1; }
+
+# --update defaults to the newest tag; fresh installs stay pinned to REF.
+if [ "$UPDATE" -eq 1 ] && [ "$REF_GIVEN" -eq 0 ] && [ -z "${HARNESS_REF:-}" ]; then
+  REF="latest"
+fi
+if [ "$REF" = "latest" ]; then
+  RESOLVED="$(git ls-remote --tags --refs "$REPO_URL" 'v*' 2>/dev/null | sed 's|.*refs/tags/||' | sort -V | tail -n 1)"
+  [ -n "$RESOLVED" ] || { echo "install.sh: no v* tags found in $REPO_URL — pass --ref explicitly." >&2; exit 1; }
+  REF="$RESOLVED"
+fi
 
 mkdir -p "$DEST"
 DEST_ABS="$(cd "$DEST" && pwd)"

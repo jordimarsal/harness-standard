@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -34,6 +34,20 @@ info() { printf "${BLUE}[INFO]${NC}  %s\n" "$1"; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 
+# Harness version: git tag (or tag-distance/SHA) of the templates checkout,
+# else the first release heading in the CHANGELOG (skips "Unreleased"), else dev.
+resolve_harness_version() {
+  local v=""
+  if command -v git >/dev/null 2>&1; then
+    v="$(git -C "$SCRIPT_DIR" describe --tags --always 2>/dev/null || true)"
+  fi
+  if [ -z "$v" ]; then
+    v="$(sed -n 's/^## \(v[0-9][0-9A-Za-z.]*\).*/\1/p' "$TEMPLATES_DIR/CHANGELOG.md" 2>/dev/null | head -n 1)"
+  fi
+  printf '%s' "${v:-dev}"
+}
+HARNESS_VERSION="$(resolve_harness_version)"
+
 if [ ! -d "$TEMPLATES_DIR" ]; then
   fail "Templates directory not found at $TEMPLATES_DIR"
   exit 1
@@ -42,6 +56,8 @@ fi
 # ── Tool / modules / audit-level selection ─────────────
 TOOL=""
 FORCE=0
+UPDATE=0
+FORCE_SOURCE=""
 MODULES_FLAG=""
 AUDIT_LEVEL=""
 for arg in "$@"; do
@@ -49,15 +65,21 @@ for arg in "$@"; do
     --tool=claude)   TOOL="claude" ;;
     --tool=opencode) TOOL="opencode" ;;
     --force) FORCE=1 ;;
+    --update) UPDATE=1 ;;
     --modules=*)     MODULES_FLAG="${arg#--modules=}" ;;
     --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update]"
       exit 1
       ;;
   esac
 done
+
+if [ "$FORCE" -eq 1 ] && [ "$UPDATE" -eq 1 ]; then
+  fail "Use --update or --force, not both."
+  exit 1
+fi
 
 if [ -n "$AUDIT_LEVEL" ]; then
   case "$AUDIT_LEVEL" in
@@ -67,6 +89,47 @@ if [ -n "$AUDIT_LEVEL" ]; then
       exit 1
       ;;
   esac
+fi
+
+# ── --update: preload stored config from the installed harness ──
+# Reads tool/modules/audit level from the project itself; flags still override.
+# Absence never drops anything (unlike --force, which re-asks from scratch).
+if [ "$UPDATE" -eq 1 ]; then
+  if [ ! -f "harness/feature_list.json" ]; then
+    fail "No harness installed here — nothing to update. Install first."
+    exit 1
+  fi
+  OLD_VERSION="$(sed -n 's/.*"harness_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/feature_list.json | head -n 1)"
+  OLD_VERSION="${OLD_VERSION:-unknown (pre-versioning install)}"
+  if [ -z "$TOOL" ]; then
+    if [ -f "CLAUDE.md" ]; then
+      TOOL="claude"
+    elif [ -f "AGENTS.md" ]; then
+      TOOL="opencode"
+    else
+      fail "Cannot detect the driving tool (no CLAUDE.md or AGENTS.md at the root). Pass --tool=claude|opencode."
+      exit 1
+    fi
+  fi
+  if [ -z "$MODULES_FLAG" ]; then
+    MODULES_FLAG="$(sed -n 's/.*"modules"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p' harness/feature_list.json | head -n 1 | tr -d '"[:space:]')"
+    if [ -n "$MODULES_FLAG" ]; then
+      info "Update: re-applying stored modules: $(printf '%s' "$MODULES_FLAG" | tr ',' ' ')"
+    fi
+  fi
+  if [ -z "$AUDIT_LEVEL" ]; then
+    AUDIT_LEVEL="$(sed -n 's/.*"audit_level"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/feature_list.json | head -n 1)"
+    case "$AUDIT_LEVEL" in
+      basic|standard|strict) ;;
+      "") AUDIT_LEVEL="basic" ;;
+      *)
+        fail "Stored audit_level '$AUDIT_LEVEL' is invalid — fix harness/feature_list.json or pass --audit-level=basic|standard|strict."
+        exit 1
+        ;;
+    esac
+  fi
+  FORCE=1
+  FORCE_SOURCE="update"
 fi
 
 # Interactive prompts require a TTY (curl pipes and CI have none).
@@ -97,7 +160,15 @@ info "Tool: $TOOL"
 
 # ── Check existing harness ─────────────────────────────
 if [ "$FORCE" -eq 1 ]; then
-  info "Force reinstall: refreshing templates."
+  if [ "$FORCE_SOURCE" = "update" ]; then
+    if [ "$OLD_VERSION" = "$HARNESS_VERSION" ]; then
+      info "Update: same version ($HARNESS_VERSION) — repairing harness-managed files."
+    else
+      info "Updating harness: $OLD_VERSION -> $HARNESS_VERSION"
+    fi
+  else
+    info "Force reinstall: refreshing templates."
+  fi
   info "Preserved if present: harness/feature_list.json, harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md"
   rm -rf .claude/agents .opencode/agent .claude/skills/wekan-tasks .opencode/skill/wekan-tasks
   rm -f CLAUDE.md AGENTS.md opencode.json .claude/settings.json
@@ -408,6 +479,12 @@ refresh_project_metadata() {  # refresh_project_metadata <feature-list>
   else
     warn "Could not update 'audit_level' in $fl — set it manually in the project section."
   fi
+  if grep -q '"harness_version"[[:space:]]*:' "$fl"; then
+    sed "s|\"harness_version\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"harness_version\": \"$HARNESS_VERSION\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
+  else
+    # Pre-versioning install: add the stamp as the last project property.
+    sed "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"|\"audit_level\": \"\1\",\n    \"harness_version\": \"$HARNESS_VERSION\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
+  fi
 }
 
 # ── Copy templates ─────────────────────────────────────
@@ -456,6 +533,7 @@ if [ ! -f "harness/feature_list.json" ]; then
   sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
       -e "s|{{MODULES}}|$MODULES_JSON|g" \
       -e "s|{{AUDIT_LEVEL}}|$AUDIT_LEVEL|g" \
+      -e "s|{{HARNESS_VERSION}}|$HARNESS_VERSION|g" \
       "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
 else
   ok "Keeping existing harness/feature_list.json"
@@ -609,7 +687,7 @@ if [ $EXIT_CODE -eq 0 ]; then
   cat > HARNESS.md <<EOF
 # Harness — $PROJECT_NAME
 
-Installed with [harness-standard](https://github.com/jordimarsal/harness-standard) (\`$TOOL\`).
+Installed with [harness-standard](https://github.com/jordimarsal/harness-standard) (\`$TOOL\`, \`$HARNESS_VERSION\`).
 
 - **Stack detected:** $STACK
 - **Roles:** Leader · Spec Author · Implementer · Reviewer (\`$ROLES_DIR\`)
@@ -621,6 +699,7 @@ Installed with [harness-standard](https://github.com/jordimarsal/harness-standar
 1. Edit \`docs/architecture.md\` and \`docs/conventions.md\` for this project.
 2. Add features to \`harness/feature_list.json\`.
 3. Start the leader: \`$TOOL\`
+4. Update later: re-run install.sh with \`--update\` (keeps specs, progress and settings).
 
 First prompt:
 

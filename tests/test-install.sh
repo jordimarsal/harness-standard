@@ -1058,6 +1058,75 @@ test_remote_install() {
   assert_count "$t" "^Next:" "$d/out.txt" 1
 }
 
+test_update_requires_harness() {
+  local t="--update without an installed harness is refused"
+  run_test "$t"
+  local d; d=$(new_project "update-empty")
+  if (cd "$d" && "$INIT" --update >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --update succeeded on an empty project")
+    echo "    FAIL: --update must fail when no harness is installed"
+  else
+    PASS=$((PASS + 1))
+  fi
+}
+
+test_update_flow() {
+  local t="--update re-applies stored config and preserves user state"
+  run_test "$t"
+  local d; d=$(new_project "update-flow")
+  (cd "$d" && "$INIT" --tool=opencode --modules=decision-memory --audit-level=standard >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: initial install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" '"harness_version"' "$d/harness/feature_list.json"
+  assert_grep "$t" ', `' "$d/HARNESS.md"
+  echo "user state" > "$d/harness/progress/impl_marker.md"
+  local out
+  if out="$(cd "$d" && "$INIT" --update 2>&1)"; then
+    PASS=$((PASS + 1))
+  else
+    printf '%s\n' "$out" > "$d/update.log"
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --update exited non-zero")
+    echo "    FAIL: see $d/update.log"
+    return
+  fi
+  printf '%s\n' "$out" > "$d/update.log"
+  # Same repo state → same resolved version → the repair branch of the report.
+  assert_grep "$t" "repairing harness-managed" "$d/update.log"
+  assert_grep "$t" '"decision-memory"' "$d/harness/feature_list.json"
+  assert_grep "$t" '"audit_level": "standard"' "$d/harness/feature_list.json"
+  assert_file "$t" "$d/harness/decisions/_template.md"
+  assert_file "$t" "$d/harness/progress/impl_marker.md"
+  assert_file "$t" "$d/AGENTS.md"
+}
+
+test_remote_update() {
+  local t="install.sh --update refreshes an installed project from a local clone"
+  run_test "$t"
+  local d; d=$(new_project "remote-update")
+  if HARNESS_REPO_URL="$REPO_DIR" HARNESS_REF=main \
+       bash "$REPO_DIR/install.sh" --tool=claude --dest "$d" > "$d/install.txt" 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: initial install failed")
+    echo "    FAIL: see $d/install.txt"
+    return
+  fi
+  echo "user state" > "$d/harness/progress/impl_marker.md"
+  if HARNESS_REPO_URL="$REPO_DIR" HARNESS_REF=main \
+       bash "$REPO_DIR/install.sh" --update --dest "$d" > "$d/update.txt" 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed")
+    echo "    FAIL: see $d/update.txt"
+    return
+  fi
+  assert_grep "$t" "repairing harness-managed" "$d/update.txt"
+  assert_file "$t" "$d/harness/progress/impl_marker.md"
+  assert_grep "$t" '"harness_version"' "$d/harness/feature_list.json"
+  assert_file "$t" "$d/HARNESS.md"
+}
+
 test_non_tty_no_prompts() {
   local t="non-TTY stdin installs with defaults and prints no menus"
   run_test "$t"
@@ -1128,6 +1197,9 @@ test_evals_fixtures
 test_force_modules_replace_sections
 test_wekan_tickets_tool_dst
 test_remote_install
+test_update_requires_harness
+test_update_flow
+test_remote_update
 test_non_tty_no_prompts
 test_force_switch_modules_metadata
 

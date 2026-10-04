@@ -3,7 +3,8 @@
     "name": "{{PROJECT_NAME}}",
     "parallel": false,
     "modules": [{{MODULES}}],
-    "audit_level": "{{AUDIT_LEVEL}}"
+    "audit_level": "{{AUDIT_LEVEL}}",
+    "harness_version": "{{HARNESS_VERSION}}"
   },
   "features": []
 }

@@ -14,6 +14,14 @@
   pick it up as a conditional capability.
 - **README**: new "Cost discipline" and "Optional modules" sections; the
   uninstall snippet now also removes `docs/log-reader-protocol.md`.
+- **Version stamp + `--update`**: every install records its harness version in
+  `harness/feature_list.json` (`project.harness_version`) and `HARNESS.md`.
+  New `--update` mode: detects the installed version and tool, re-applies the
+  stored modules and audit level without flags (fixing the `--force` footgun
+  that silently dropped them), and refreshes harness-managed files while
+  preserving user state. `install.sh --ref=latest` resolves the newest tag;
+  `--update` defaults to it. First update-capable release is the one that
+  ships this change.
 - **Feature retro line**: when a feature closes, the summary moved to
   `harness/progress/history.md` carries `retro: <n> dispatches · <s> stalls ·
   <r> restarts` — the per-feature efficiency record that shows where process

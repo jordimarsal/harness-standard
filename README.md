@@ -23,6 +23,22 @@ writes `HARNESS.md` into your repo with the next step.
 Requires `git`. Non-interactive installs (CI, pipes) skip the prompts and use
 defaults: tool `claude`, no optional modules, audit level `basic`.
 
+## Update
+
+Already installed? Re-run the installer with `--update`. It detects the
+installed version and tool, re-applies the stored modules and audit level,
+and refreshes every harness-managed file while keeping your state
+(`harness/feature_list.json`, `harness/progress/`, `harness/specs/`,
+`docs/architecture.md`, `docs/conventions.md`):
+
+```bash
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --update
+```
+
+Without `--ref`, `--update` fetches the newest `v*` tag (fresh installs stay
+pinned to the default version). The installed version is recorded in
+`harness/feature_list.json` (`project.harness_version`) and `HARNESS.md`.
+
 ## What gets installed
 
 - **Leader** — orchestrates, stops at the human approval gate.
