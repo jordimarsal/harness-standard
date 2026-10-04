@@ -42,6 +42,11 @@ Read `"audit_level"` from the `project` section of `harness/feature_list.json`
   non-zero exit (coverage gaps) rejects the approval. Your semantic judgment
   (does the test really verify the requirement?) still applies on top — the
   script only proves the mapping exists.
+- **log-reader** (when `docs/log-reader-protocol.md` exists) — for logs over
+  ~200 lines you may dispatch a read-only reader per that protocol instead of
+  grepping them yourself; every cited line must then be verified against the
+  original before it counts as evidence, and anything you cannot re-verify
+  yourself is a defect.
 
 Checkpoint **C7** in `harness/CHECKPOINTS.md` (when present) reflects these rules.
 

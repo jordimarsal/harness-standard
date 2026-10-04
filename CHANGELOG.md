@@ -7,6 +7,11 @@
   chat and progress files keep only the path plus a short excerpt. The
   reviewer reads big logs surgically (`grep -n`, `sed -n`) instead of
   end-to-end; the leader never pastes outputs into dispatch prompts.
+- **`log-reader` module** (optional): delegates big-log reading to a cheap
+  read-only subagent and verifies its quoted evidence against the original;
+  on verification failure it falls back to reading the exact ranges with the
+  main model. Installs `docs/log-reader-protocol.md`; leader and reviewer
+  pick it up as a conditional capability.
 - **Batch discipline** in the subagent prompts: the implementer is dispatched
   **2–4 consecutive tasks per batch** (1 when a single task is large, 4 only for
   small clones, never 5+), never a whole feature. It writes files before any

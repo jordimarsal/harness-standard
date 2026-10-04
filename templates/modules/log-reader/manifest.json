@@ -1,0 +1,9 @@
+{
+  "name": "log-reader",
+  "description": "Delegate big-log reading to a cheap read-only subagent and verify its evidence before acting on it",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "log-reader-protocol.md", "dst": "docs/log-reader-protocol.md", "mode": "copy" }
+  ],
+  "verify": ["docs/log-reader-protocol.md"]
+}

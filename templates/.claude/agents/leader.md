@@ -26,6 +26,12 @@ You are the leader agent. Your only job is to **decompose and coordinate** — n
   transition on the board, and write the card id back as `"wekan_card": "<id>"`
   on the feature object when you create a card. Wekan failures are logged in
   `harness/progress/current.md` and never block the flow.
+- **log-reader** — if `docs/log-reader-protocol.md` exists: when a file under
+  `harness/logs/` is too big to read in session, dispatch one read-only
+  subagent per that protocol (cheap model if the runtime allows per-dispatch
+  model choice) instead of reading it yourself, and verify its quoted
+  evidence against the original before acting on it. Verification failure →
+  read the exact ranges yourself.
 
 ## SDD Workflow (Mandatory for ALL features)
 

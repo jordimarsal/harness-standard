@@ -206,7 +206,7 @@ test_interactive_module_menu() {
   }
   PASS=$((PASS + 1))
   printf '%s\n' "$out" > "$d/init-output.txt"
-  for m in architecture-catalog iterative-refinement decision-memory project-scanner security-audit performance-benchmarks wekan-tickets; do
+  for m in architecture-catalog iterative-refinement decision-memory log-reader project-scanner security-audit performance-benchmarks wekan-tickets; do
     assert_grep "$t" "$m" "$d/init-output.txt"
   done
   assert_grep "$t" "Audit level" "$d/init-output.txt"
@@ -481,6 +481,20 @@ test_module_filtered_by_stack() {
   else
     PASS=$((PASS + 1))
   fi
+}
+
+test_log_reader_module() {
+  local t="log-reader installs protocol doc and records the module"
+  run_test "$t"
+  local d; d=$(new_project "log-reader")
+  (cd "$d" && "$INIT" --tool=claude --modules=log-reader >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/docs/log-reader-protocol.md"
+  assert_grep "$t" '"log-reader"' "$d/harness/feature_list.json"
+  assert_grep "$t" "Evidence format" "$d/docs/log-reader-protocol.md"
+  assert_grep "$t" "Verification (dispatcher's duty" "$d/docs/log-reader-protocol.md"
 }
 
 test_project_scanner_module() {
@@ -1101,6 +1115,7 @@ test_default_install_no_modules
 test_invalid_module_rejected
 test_invalid_audit_level_rejected
 test_module_filtered_by_stack
+test_log_reader_module
 test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict
