@@ -112,6 +112,10 @@ elif [ -f "build.gradle" ]; then
   TEST_CMD="./gradlew test 2>&1"
 elif [ -f "pom.xml" ]; then
   TEST_CMD="mvn test 2>&1"
+elif [ -f "pyproject.toml" ] && [ -f "uv.lock" ] && command -v uv >/dev/null 2>&1; then
+  # uv-managed python project: run through uv so the project venv and its
+  # pinned toolchain are used (a bare python3 -m pytest fails: no pytest).
+  TEST_CMD="uv run pytest tests 2>&1"
 elif [ -d "tests" ] && command -v python3 >/dev/null 2>&1; then
   TEST_CMD="python3 -m pytest -q tests 2>&1"
 fi
@@ -128,6 +132,17 @@ else
   warn "No test framework detected — skipping test run"
   fail "No test evidence: test step was not performed"
   EXIT_CODE=1
+fi
+
+# Polyglot repos: a web/ subproject runs its own suite alongside the root one.
+if [ -f "web/package.json" ]; then
+  echo "Running: npm --prefix web test"
+  if npm --prefix web test 2>&1; then
+    ok "Web tests pass"
+  else
+    fail "Web tests failing"
+    EXIT_CODE=1
+  fi
 fi
 
 echo ""

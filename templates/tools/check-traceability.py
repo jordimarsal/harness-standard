@@ -38,7 +38,10 @@ def find_requirements(root: Path, feature: str) -> set[str]:
 
 ATTR_RE = re.compile(r"(?im)^\s*feature\s*:\s*([A-Za-z0-9_-]+)\s*$")
 
-def collect_tables(root: Path, feature: str | None = None) -> tuple[dict[str, list[str]], dict[str, str]]:
+
+def collect_tables(
+    root: Path, feature: str | None = None
+) -> tuple[dict[str, list[str]], dict[str, str]]:
     """Merge only those impl_*.md tables attributed to `feature` (protocol v1.1)."""
     merged: dict[str, list[str]] = {}
     statuses: dict[str, str] = {}
@@ -70,6 +73,7 @@ def collect_tables(root: Path, feature: str | None = None) -> tuple[dict[str, li
 
 def test_identifier_exists(root: Path, identifier: str) -> bool:
     import ast
+
     tests_dir = root / "tests"
     if not tests_dir.is_dir():
         return False
@@ -82,7 +86,10 @@ def test_identifier_exists(root: Path, identifier: str) -> bool:
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == ident:
+            if (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and node.name == ident
+            ):
                 return True
     return False
 
@@ -95,11 +102,21 @@ def check_feature(root: Path, feature: str) -> dict:
     for req in sorted(requirements, key=lambda r: int(r[1:])):
         tests = tables.get(req)
         if not tests:
-            gaps.append({"requirement": req, "reason": "not present in any impl traceability table"})
+            gaps.append(
+                {
+                    "requirement": req,
+                    "reason": "not present in any impl traceability table",
+                }
+            )
             continue
         missing = [t for t in tests if not test_identifier_exists(root, t)]
         if missing:
-            gaps.append({"requirement": req, "reason": f"test identifier(s) not found under tests/: {', '.join(missing)}"})
+            gaps.append(
+                {
+                    "requirement": req,
+                    "reason": f"test identifier(s) not found under tests/: {', '.join(missing)}",
+                }
+            )
             continue
         covered += 1
     # protocol §5: unresolved = requirements whose table Status is not "done"
@@ -148,12 +165,17 @@ def main(argv: list[str]) -> int:
             root = Path(a)
         i += 1
     if not all_features and feature is None:
-        print("usage: check-traceability.py --all | --feature NAME [--json] [root]", file=sys.stderr)
+        print(
+            "usage: check-traceability.py --all | --feature NAME [--json] [root]",
+            file=sys.stderr,
+        )
         return 2
 
     specs_dir = root / "harness" / "specs"
     if all_features:
-        names = sorted(p.name for p in specs_dir.iterdir() if p.is_dir()) if specs_dir.is_dir() else []
+        names = (
+            sorted(p.name for p in specs_dir.iterdir() if p.is_dir()) if specs_dir.is_dir() else []
+        )
     else:
         names = [feature]
 
@@ -161,12 +183,16 @@ def main(argv: list[str]) -> int:
     verdict = "PASS" if all(r["gaps"] == [] for r in results) else "FAIL"
 
     if as_json:
-        print(json.dumps({
-            "tool": "check-traceability",
-            "protocol": 1,
-            "verdict": verdict,
-            "features": results,
-        }))
+        print(
+            json.dumps(
+                {
+                    "tool": "check-traceability",
+                    "protocol": 1,
+                    "verdict": verdict,
+                    "features": results,
+                }
+            )
+        )
     else:
         for r in results:
             print(f"## {r['name']}: {r['covered']}/{r['requirements']} requirements covered")

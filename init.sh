@@ -449,7 +449,11 @@ case "$STACK" in
     fi
     ;;
   python)
-    TEST_CMD="python3 -m pytest -q tests"
+    if command -v uv >/dev/null 2>&1 && [ -f "uv.lock" ]; then
+      TEST_CMD="uv run pytest tests"
+    else
+      TEST_CMD="python3 -m pytest -q tests"
+    fi
     BUILD_CMD="echo 'no build step for python'"
     ;;
   rust)

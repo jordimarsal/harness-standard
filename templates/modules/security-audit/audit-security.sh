@@ -127,7 +127,7 @@ case "$STACK" in
       fi
     else
       [ "$JSON" -eq 1 ] && SKIPPED+=("bandit: not installed")
-      [ "$JSON" -eq 1 ] || echo "## SAST: bandit — SKIPPED (not installed; pip install bandit)"
+      [ "$JSON" -eq 1 ] || echo "## SAST: bandit — SKIPPED (not installed; uvx bandit, or pip install bandit)"
     fi
     if command -v pip-audit >/dev/null 2>&1; then
       if [ "$JSON" -eq 1 ]; then
@@ -147,7 +147,7 @@ case "$STACK" in
       fi
     else
       [ "$JSON" -eq 1 ] && SKIPPED+=("pip-audit: not installed")
-      [ "$JSON" -eq 1 ] || echo "## Dependency scan: pip-audit — SKIPPED (not installed; pip install pip-audit)"
+      [ "$JSON" -eq 1 ] || echo "## Dependency scan: pip-audit — SKIPPED (not installed; uvx pip-audit, or pip install pip-audit)"
     fi
     ;;
   typescript|node)

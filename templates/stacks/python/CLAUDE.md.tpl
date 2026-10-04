@@ -36,12 +36,12 @@ When dispatching subagents, instruct them to **write results to files** and retu
 
 ## Stack: Python
 - **Version:** Python 3.10+ (modern syntax; avoid legacy patterns).
-- **Testing:** `poetry run pytest -q tests` (Poetry) or `python3 -m pytest -q tests` (fallback).
+- **Testing:** `uv run pytest tests` (uv) · `poetry run pytest -q tests` (Poetry) · `python3 -m pytest -q tests` (fallback). Run tests through the project's toolchain (uv/Poetry) so the locked venv is used — a bare `python3 -m pytest` fails when pytest only lives in the venv.
 - **Quality gates (run before marking anything done):**
   1. `ruff check --fix --show-fixes .`
   2. `black .`
   3. `mypy --check-untyped-defs --strict .`
-  4. `python3 -m pytest -q tests`
+  4. `uv run pytest tests` (uv) or `python3 -m pytest -q tests` (fallback)
 - **Key conventions:**
   - PEP 8 style, max 100 character lines. Double quotes `"..."` always.
   - snake_case for functions/variables, PascalCase for classes.
