@@ -93,6 +93,7 @@ Add `--modules=a,b` to the install command, or pick them in the interactive
 menu:
 
 - `architecture-catalog` — reference catalog of architecture options for design decisions
+- `clarity` — 80% ASD-STE100 response style: short active sentences, one term one meaning, no filler
 - `decision-memory` — ADR files for decisions worth remembering beyond a feature
 - `iterative-refinement` — adaptive iteration protocol with self-review and adversarial checklist
 - `log-reader` — delegate big-log reading to a cheap read-only subagent and verify its evidence

@@ -206,7 +206,7 @@ test_interactive_module_menu() {
   }
   PASS=$((PASS + 1))
   printf '%s\n' "$out" > "$d/init-output.txt"
-  for m in architecture-catalog iterative-refinement decision-memory log-reader project-scanner security-audit performance-benchmarks wekan-tickets; do
+  for m in architecture-catalog clarity iterative-refinement decision-memory log-reader project-scanner security-audit performance-benchmarks wekan-tickets; do
     assert_grep "$t" "$m" "$d/init-output.txt"
   done
   assert_grep "$t" "Audit level" "$d/init-output.txt"
@@ -495,6 +495,26 @@ test_log_reader_module() {
   assert_grep "$t" '"log-reader"' "$d/harness/feature_list.json"
   assert_grep "$t" "Evidence format" "$d/docs/log-reader-protocol.md"
   assert_grep "$t" "Verification (dispatcher's duty" "$d/docs/log-reader-protocol.md"
+}
+
+test_clarity_module() {
+  local t="clarity installs style doc with tweet references and records the module"
+  run_test "$t"
+  local d; d=$(new_project "clarity")
+  (cd "$d" && "$INIT" --tool=opencode --modules=clarity >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/docs/clarity-style.md"
+  assert_grep "$t" '"clarity"' "$d/harness/feature_list.json"
+  assert_grep "$t" "80% ASD-STE100" "$d/docs/clarity-style.md"
+  assert_grep "$t" "x.com/karpathy/status/2105819303471976479" "$d/docs/clarity-style.md"
+  assert_grep "$t" "x.com/kunchenguid/status/2105931853815296295" "$d/docs/clarity-style.md"
+  (cd "$d" && "$INIT" --update --remove-modules=clarity >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --remove-modules failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_no_file "$t" "$d/docs/clarity-style.md"
 }
 
 test_project_scanner_module() {
@@ -1256,6 +1276,7 @@ test_invalid_module_rejected
 test_invalid_audit_level_rejected
 test_module_filtered_by_stack
 test_log_reader_module
+test_clarity_module
 test_project_scanner_module
 test_security_audit_module
 test_modules_install_strict

@@ -2,6 +2,13 @@
 
 ## Unreleased — 2026-10-04
 
+- **`clarity` module** (optional): 80% ASD-STE100 response style —
+  short active sentences, one term one meaning, no filler. Installs
+  `docs/clarity-style.md`. References: Karpathy 2026-10-02
+  (`https://x.com/karpathy/status/2105819303471976479`) and Kun Chen
+  reply 2026-10-02
+  (`https://x.com/kunchenguid/status/2105931853815296295`). Subset
+  mined from the last 10 local opencode sessions.
 - **README**: new maintainer-facing "Releasing" section — the four-step
   release ritual (CHANGELOG heading, REF/package.json bump + commit, annotated
   tag, `gh release create` from the CHANGELOG section). A pushed tag alone

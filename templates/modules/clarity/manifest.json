@@ -1,0 +1,9 @@
+{
+  "name": "clarity",
+  "description": "80% ASD-STE100 response style: short active sentences, one term one meaning, no filler",
+  "stacks": ["typescript", "node", "android", "java", "python", "rust", "generic"],
+  "injects": [
+    { "src": "clarity-style.md", "dst": "docs/clarity-style.md", "mode": "copy" }
+  ],
+  "verify": ["docs/clarity-style.md"]
+}
