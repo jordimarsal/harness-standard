@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-10-04
+## v0.4.0 — 2026-10-06
 
 - **`clarity` module** (optional): 80% ASD-STE100 response style —
   short active sentences, one term one meaning, no filler. Installs
@@ -9,10 +9,33 @@
   reply 2026-10-02
   (`https://x.com/kunchenguid/status/2105931853815296295`). Subset
   mined from the last 10 local opencode sessions.
+- **Brand badge**: terminal-style SVG asset (`assets/badge.svg`, 210x20 —
+  traffic lights + `built with | harness-standard` in prompt green on
+  near-black, mono type) plus a light-theme variant (`assets/badge-light.svg`,
+  warm paper segments and darker signal greens for contrast). README
+  documents canonical usage and the theme-adaptive swap pattern.
+- **uv-managed Python + polyglot gates**: `init-verify.sh` runs pytest
+  through `uv` when `pyproject.toml` + `uv.lock` exist and runs the
+  `web/` subproject suite alongside the root one; the Python-stack
+  `TEST_CMD` in `opencode.json` follows the same detection.
+- **`check-traceability` fixes**: identifiers containing `::` are exact
+  node ids (`tests/path/file.py::test_name`) instead of silently gapping;
+  `--all` skips features whose status is not `done` (no impl table yet is
+  not a gap).
+- **Lint-clean tools**: `validate-feature-list.py` and
+  `check-traceability.py` pass a strict ruff config (line-length 100,
+  isort) so refreshed projects keep their quality gates green.
+- **Templates**: batching hard rule, one-batch-at-a-time workflow step and
+  §4 Batching subsection in `AGENTS.md`; *size for batches* rule in
+  `docs/specs.md`; two reviewer anti-patterns in `docs/verification.md`
+  (trusting a subagent's "done" claim; reading the test count under
+  `addopts='-q'`). Upstreamed from real usage (tenda).
 - **README**: new maintainer-facing "Releasing" section — the four-step
   release ritual (CHANGELOG heading, REF/package.json bump + commit, annotated
   tag, `gh release create` from the CHANGELOG section). A pushed tag alone
   never shows on the Releases page.
+- Fresh installs now default to `v0.4.0` (installer REF pin); `package.json`
+  version aligned to the release.
 
 ## v0.3.0 — 2026-10-04
 

@@ -11,11 +11,11 @@
 # to the default REF).
 #
 # Env: HARNESS_REPO_URL (default https://github.com/jordimarsal/harness-standard.git)
-#      HARNESS_REF      (default v0.3.0)
+#      HARNESS_REF      (default v0.4.0)
 set -euo pipefail
 
 REPO_URL="${HARNESS_REPO_URL:-https://github.com/jordimarsal/harness-standard.git}"
-REF="${HARNESS_REF:-v0.3.0}"
+REF="${HARNESS_REF:-v0.4.0}"
 REF_GIVEN=0
 UPDATE=0
 DEST="."
