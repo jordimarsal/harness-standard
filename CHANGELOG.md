@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 — 2026-10-06
 
 - **Project block (`harness:project`)**: the entry file (`CLAUDE.md` /
   `AGENTS.md`) ends with a marked, project-owned block. `--update`/`--force`
