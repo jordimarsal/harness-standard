@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased — 2026-10-06
+## v0.4.1 — 2026-10-06
 
 - **README badge suggestion**: on success, the installer prints the
   canonical raw-URL badge snippet only when `README.md` exists without a
   "built with harness-standard" badge — and never writes into the file
   (README is user-owned). Idempotent across `--update`: once the badge is
   added, no re-suggestion. No README, no suggestion.
+- Fresh installs now default to `v0.4.1` (installer REF pin); `package.json`
+  version aligned to the release.
 
 ## v0.4.0 — 2026-10-06
 
