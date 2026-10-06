@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -13,12 +13,19 @@
 #   on a TTY at install). Existing files are regenerated only when
 #   installer-generated (byte-identical) or when --architecture is given.
 #
-# Safe: refuses to overwrite an existing harness. Use --force to reinstall:
-# it refreshes templates but preserves user state (harness/feature_list.json,
-# harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md).
-# Use --update instead: it reuses the stored tool/modules/audit configuration,
-# never drops modules, and can add (--add-modules) or remove (--remove-modules)
-# modules at any time.
+# Safe: never silently overwrites your files. On a fresh install, files the
+# installer would replace (the tool entry file, its config, the agents dir,
+# docs/specs.md, docs/verification.md, HARNESS.md, module copies) are moved —
+# never deleted — to harness/backup/<UTC>/ (preserving their relative path)
+# after an interactive prompt on a TTY, or with --backup[=DIR] when
+# non-interactive; without either, the install aborts and nothing is written.
+# --force reinstalls and refreshes templates but preserves user state
+# (harness/feature_list.json, harness/progress/, harness/specs/,
+# docs/architecture.md, docs/conventions.md); replaced files that differ from
+# the current templates are backed up first, so a routine --update of an
+# untouched project creates no backup noise. Use --update instead of --force:
+# it reuses the stored tool/modules/audit configuration, never drops modules,
+# and can add (--add-modules) or remove (--remove-modules) modules anytime.
 
 set -euo pipefail
 
@@ -62,6 +69,8 @@ TOOL=""
 FORCE=0
 UPDATE=0
 FORCE_SOURCE=""
+BACKUP_MODE=0
+BACKUP_DIR_OPT=""
 MODULES_FLAG=""
 ADD_MODULES_FLAG=""
 REMOVE_MODULES_FLAG=""
@@ -74,6 +83,8 @@ for arg in "$@"; do
     --tool=opencode) TOOL="opencode" ;;
     --force) FORCE=1 ;;
     --update) UPDATE=1 ;;
+    --backup)        BACKUP_MODE=1 ;;
+    --backup=*)      BACKUP_MODE=1; BACKUP_DIR_OPT="${arg#--backup=}" ;;
     --modules=*)     MODULES_FLAG="${arg#--modules=}" ;;
     --add-modules=*) ADD_MODULES_FLAG="${arg#--add-modules=}" ;;
     --remove-modules=*) REMOVE_MODULES_FLAG="${arg#--remove-modules=}" ;;
@@ -81,7 +92,7 @@ for arg in "$@"; do
     --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]"
       exit 1
       ;;
   esac
@@ -221,20 +232,10 @@ if [ "$FORCE" -eq 1 ]; then
     info "Force reinstall: refreshing templates."
   fi
   info "Preserved if present: harness/feature_list.json, harness/progress/, harness/specs/, docs/architecture.md, docs/conventions.md"
-  rm -rf .claude/agents .opencode/agent .claude/skills/wekan-tasks .opencode/skill/wekan-tasks
-  rm -f CLAUDE.md AGENTS.md opencode.json .claude/settings.json
-  if [ -d .claude ] && [ -z "$(ls -A .claude 2>/dev/null)" ]; then rmdir .claude; fi
-  if [ -d .opencode ] && [ -z "$(ls -A .opencode 2>/dev/null)" ]; then rmdir .opencode; fi
-  if [ -d .claude ]; then
-    warn "Keeping non-harness files in .claude/: $(find .claude -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
-  fi
-  if [ -d .opencode ]; then
-    warn "Keeping non-harness files in .opencode/: $(find .opencode -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
-  fi
-  rm -f CLAUDE.md AGENTS.md opencode.json
-elif [ -d "harness" ] || [ -f "CLAUDE.md" ] || [ -f "AGENTS.md" ] || [ -d ".claude" ] || [ -d ".opencode" ]; then
-  fail "A harness is already installed in this directory (harness/, CLAUDE.md, AGENTS.md, .claude/ or .opencode/ exists)."
-  fail "Remove existing harness files before reinstalling, or use --force to reinstall (keeps user state)."
+  info "Replaced files that differ from the templates are backed up first (summary at the end)."
+elif [ -d "harness" ]; then
+  fail "A harness is already installed in this directory (harness/ exists)."
+  fail "Use --update to refresh it, or --force to reinstall (keeps user state)."
   exit 1
 fi
 
@@ -474,6 +475,163 @@ case "$PROJECT_NAME" in
     PROJECT_NAME="project"
     ;;
 esac
+
+# ── Collision backup: move aside, never silently overwrite ──
+# Fresh install: files the installer would replace are moved (never deleted)
+# to harness/backup/<UTC>/ preserving their relative path — after an
+# interactive prompt (TTY), or only with --backup[=DIR] when non-interactive;
+# without either, the install aborts before writing anything.
+# --force/--update: harness-managed targets are refreshed in place, but any
+# file that differs from the current templates is backed up first, so a
+# routine update of an untouched project creates no backup noise.
+BACKUP_DIR="${BACKUP_DIR_OPT}"
+MOVED=()
+
+default_backup_dir() { printf 'harness/backup/%s' "$(date -u +%Y-%m-%dT%H%M%SZ)"; }
+
+backup_collision() {  # backup_collision <relative-path>
+  local rel="$1" dest
+  dest="$BACKUP_DIR/$rel"
+  if [ -e "$dest" ]; then
+    fail "Backup target already exists: $dest — aborting (nothing was overwritten)."
+    exit 1
+  fi
+  mkdir -p "$(dirname "$dest")"
+  mv "$rel" "$dest"
+  MOVED+=("$rel")
+}
+
+entry_tpl() {  # entry_tpl <tool> — template file the tool entry file is rendered from
+  local t="$1"
+  if [ "$t" = "claude" ]; then
+    if [ -f "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl" ]; then
+      printf '%s' "$TEMPLATES_DIR/stacks/$STACK/CLAUDE.md.tpl"
+    else
+      printf '%s' "$TEMPLATES_DIR/stacks/generic/CLAUDE.md.tpl"
+    fi
+  else
+    printf '%s' "$TEMPLATES_DIR/AGENTS.md"
+  fi
+}
+
+tool_config_differs() {  # tool_config_differs <tool> — exit 0 when the installed config differs from a fresh render
+  local t="$1" rendered file tpl
+  if [ "$t" = "claude" ]; then
+    file=".claude/settings.json"; tpl="$TEMPLATES_DIR/.claude/settings.json"
+  else
+    file="opencode.json"; tpl="$TEMPLATES_DIR/opencode.json"
+  fi
+  [ -f "$file" ] || return 1
+  rendered="$(sed -e "s|{{TEST_CMD}}|$TEST_CMD|g" -e "s|{{BUILD_CMD}}|$BUILD_CMD|g" "$tpl")"
+  if [ "$rendered" = "$(cat "$file")" ]; then return 1; fi
+  return 0
+}
+
+agents_dir_differs() {  # agents_dir_differs <dir> <tool> — any installed agent differs from its template?
+  local dir="$1" t="$2" a tpl
+  [ -d "$dir" ] || return 1
+  for a in leader spec-author implementer reviewer; do
+    if [ "$t" = "claude" ]; then tpl="$TEMPLATES_DIR/.claude/agents/$a.md"; else tpl="$TEMPLATES_DIR/.opencode/agent/$a.md"; fi
+    if [ -f "$dir/$a.md" ] && ! cmp -s "$dir/$a.md" "$tpl"; then return 0; fi
+  done
+  return 1
+}
+
+refresh_tool_files() {  # refresh_tool_files <tool> — back up customized files, then remove the tool's files
+  local t="$1" entry cfg adir tpl
+  if [ "$t" = "claude" ]; then
+    entry="CLAUDE.md"; cfg=".claude/settings.json"; adir=".claude/agents"
+  else
+    entry="AGENTS.md"; cfg="opencode.json"; adir=".opencode/agent"
+  fi
+  tpl="$(entry_tpl "$t")"
+  if [ -f "$entry" ] && [ -f "$tpl" ] && ! cmp -s "$entry" "$tpl"; then
+    backup_collision "$entry"
+  fi
+  if tool_config_differs "$t"; then
+    backup_collision "$cfg"
+  fi
+  if agents_dir_differs "$adir" "$t"; then
+    backup_collision "$adir"
+  fi
+  rm -rf "$adir"
+  rm -f "$entry" "$cfg"
+}
+
+if [ "$FORCE" -eq 1 ]; then
+  if [ -z "$BACKUP_DIR" ]; then BACKUP_DIR="$(default_backup_dir)"; fi
+  # Both tool namespaces: customized files are backed up, generated ones are
+  # replaced in place — switching tools also cleans the previous tool's files.
+  refresh_tool_files claude
+  refresh_tool_files opencode
+  # Verbatim-copied docs: back up customized copies before the refresh overwrites them.
+  for _doc in docs/specs.md docs/verification.md; do
+    if [ -f "$_doc" ] && ! cmp -s "$_doc" "$TEMPLATES_DIR/$_doc"; then backup_collision "$_doc"; fi
+  done
+  # HARNESS.md is regenerated; back it up only when it was not harness-generated.
+  if [ -f "HARNESS.md" ] && ! grep -q "Installed with \[harness-standard\]" HARNESS.md; then
+    backup_collision "HARNESS.md"
+  fi
+  rm -rf .claude/skills/wekan-tasks .opencode/skill/wekan-tasks
+  if [ -d .claude ] && [ -z "$(ls -A .claude 2>/dev/null)" ]; then rmdir .claude; fi
+  if [ -d .opencode ] && [ -z "$(ls -A .opencode 2>/dev/null)" ]; then rmdir .opencode; fi
+  if [ -d .claude ]; then
+    warn "Keeping non-harness files in .claude/: $(find .claude -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
+  fi
+  if [ -d .opencode ]; then
+    warn "Keeping non-harness files in .opencode/: $(find .opencode -mindepth 1 -maxdepth 1 -exec basename {} + 2>/dev/null | tr '\n' ' ')"
+  fi
+else
+  COLLISIONS=()
+  add_collision() { if [ -e "$1" ]; then COLLISIONS+=("$1"); fi; }
+  if [ "$TOOL" = "claude" ]; then
+    add_collision "CLAUDE.md"
+    add_collision ".claude/settings.json"
+    if [ -d ".claude/agents" ] && [ -n "$(ls -A .claude/agents 2>/dev/null)" ]; then add_collision ".claude/agents"; fi
+  else
+    add_collision "AGENTS.md"
+    add_collision "opencode.json"
+    if [ -d ".opencode/agent" ] && [ -n "$(ls -A .opencode/agent 2>/dev/null)" ]; then add_collision ".opencode/agent"; fi
+  fi
+  add_collision "docs/specs.md"
+  add_collision "docs/verification.md"
+  add_collision "HARNESS.md"
+  # Module copy targets (append-section modes manage themselves via markers).
+  for _m in "${MODULES_SELECTED[@]:+${MODULES_SELECTED[@]}}"; do
+    while IFS= read -r _line; do
+      if [ -z "$_line" ]; then continue; fi
+      if printf '%s\n' "$_line" | grep -q '"mode"[[:space:]]*:[[:space:]]*"append-section"'; then continue; fi
+      if printf '%s\n' "$_line" | grep -q '"dst"[[:space:]]*:[[:space:]]*{'; then
+        _dst=$(printf '%s\n' "$_line" | sed -n "s/.*\"$TOOL\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
+      else
+        _dst=$(printf '%s\n' "$_line" | sed -n 's/.*"dst"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+      fi
+      if [ -n "$_dst" ]; then add_collision "$_dst"; fi
+    done < <(manifest_injects "$TEMPLATES_DIR/modules/$_m/manifest.json")
+  done
+
+  if [ "${#COLLISIONS[@]}" -gt 0 ]; then
+    if [ -z "$BACKUP_DIR" ]; then BACKUP_DIR="$(default_backup_dir)"; fi
+    if [ "$BACKUP_MODE" -eq 0 ]; then
+      if is_interactive; then
+        echo ""
+        warn "This install would overwrite: ${COLLISIONS[*]}"
+        printf 'Move them to %s and continue? [y/N] ' "$BACKUP_DIR"
+        read -r _answer || _answer=""
+        case "$_answer" in
+          y|Y|yes|Yes|YES) ;;
+          *) fail "Aborted — nothing was written. Re-run with --backup[=DIR] to move the colliding files aside."; exit 1 ;;
+        esac
+      else
+        fail "This install would overwrite: ${COLLISIONS[*]}"
+        fail "Re-run with --backup[=DIR] to move them to a backup folder (nothing is deleted), or remove them yourself."
+        exit 1
+      fi
+    fi
+    for _c in "${COLLISIONS[@]}"; do backup_collision "$_c"; done
+    ok "Moved ${#MOVED[@]} path(s) to $BACKUP_DIR"
+  fi
+fi
 
 # ── Module injection ───────────────────────────────────
 # ── Install-time write confinement ─────────────────────
@@ -906,6 +1064,11 @@ done
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
   ok "Harness installed successfully for stack: $STACK (tool: $TOOL)"
+
+  if [ "${#MOVED[@]}" -gt 0 ]; then
+    info "Backed up ${#MOVED[@]} path(s) to $BACKUP_DIR: ${MOVED[*]}"
+    info "Review the backup and merge back anything you need."
+  fi
 
   if [ "$TOOL" = "claude" ]; then
     ENTRY_FILE="CLAUDE.md"

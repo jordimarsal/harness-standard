@@ -29,13 +29,35 @@ Pick the architecture up front with `--architecture=hexagonal` (or `layered`,
 choose from the menu on an interactive terminal; otherwise a generic template
 is installed. On a TTY the installer also asks.
 
+## Existing files: collision backup
+
+Installing into a project that already has an `AGENTS.md` (Codex, Cursor, …),
+`docs/specs.md` or any other file the harness would write? The installer never
+silently overwrites: it lists the colliding files and, on a TTY, asks whether
+to move them aside. Answering `y` (or passing `--backup`) moves them — never
+deletes — to `harness/backup/<UTC>/` preserving their relative paths:
+
+```bash
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=opencode --backup
+# or choose where they land:
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=opencode --backup=~/old-config
+```
+
+Non-interactive installs (CI, pipes) abort with the collision list unless
+`--backup` is given. Detection is tool-aware: an existing `AGENTS.md` does not
+collide with a claude install (`CLAUDE.md` is the entry file there), so it is
+left untouched. After the install, the summary lists everything that was
+backed up — review it and merge back what you need.
+
 ## Update
 
 Already installed? Re-run the installer with `--update`. It detects the
 installed version and tool, re-applies the stored modules and audit level,
 and refreshes every harness-managed file while keeping your state
 (`harness/feature_list.json`, `harness/progress/`, `harness/specs/`,
-`docs/architecture.md`, `docs/conventions.md`):
+`docs/architecture.md`, `docs/conventions.md`). Replaced files that you
+customized (they differ from the templates) are backed up to
+`harness/backup/<UTC>/` first — an untouched project creates no backup noise:
 
 ```bash
 curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --update

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — 2026-10-06
+
+- **Collision backup (`--backup[=DIR]`)**: installing into a project that
+  already owns files the harness would write (`AGENTS.md`, `CLAUDE.md`,
+  `opencode.json`, `.claude/settings.json`, `docs/specs.md`,
+  `docs/verification.md`, `HARNESS.md`, agents dirs, module copies) no longer
+  hard-refuses or silently clobbers. The installer lists the collisions and,
+  on a TTY, asks to move them aside; non-interactive installs require
+  `--backup`. Colliding files are **moved — never deleted —** to
+  `harness/backup/<UTC>/` preserving their relative paths, and the install
+  summary lists them for manual merge-back. Detection is tool-aware (an
+  existing `AGENTS.md` does not collide with a claude install).
+  `--force`/`--update` now back up replaced files that differ from the
+  templates instead of `rm -f`-ing them (closes the destructive gap on
+  customized entry files, configs and agent roles; an untouched project
+  creates no backup noise), and a tool switch still cleans the previous
+  tool's files. The refusal check is now `harness/`-only; foreign
+  `.claude/`/`.opencode/` content no longer blocks a fresh install.
+
 ## v0.4.1 — 2026-10-06
 
 - **README badge suggestion**: on success, the installer prints the

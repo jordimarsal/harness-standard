@@ -1264,6 +1264,116 @@ test_non_tty_no_prompts() {
   assert_grep "$t2" '"audit_level": "standard"' "$d/harness/feature_list.json"
 }
 
+test_collision_backup() {
+  local t="collision: fresh install over a foreign AGENTS.md aborts without --backup (non-TTY)"
+  run_test "$t"
+  local d; d=$(new_project "collide-refuse")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  if (cd "$d" && "$INIT" --tool=opencode </dev/null >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install should abort on collision")
+    echo "    FAIL: install proceeded over a foreign AGENTS.md without --backup"
+    return
+  fi
+  PASS=$((PASS + 1))
+  assert_grep "$t" "^# My own agents rules" "$d/AGENTS.md"
+  assert_no_dir "$t" "$d/harness"
+
+  local t2="collision: --backup moves foreign files aside and installs fresh"
+  run_test "$t2"
+  d=$(new_project "collide-backup")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  mkdir -p "$d/docs"
+  printf 'custom specs content\n' > "$d/docs/specs.md"
+  local out
+  out="$(cd "$d" && "$INIT" --tool=opencode --backup </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_grep "$t2" "Backed up 2 path" "$d/init-output.txt"
+  local bak
+  bak="$(find "$d/harness/backup" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  assert_grep "$t2" "^# My own agents rules" "$bak/AGENTS.md"
+  assert_grep "$t2" "custom specs content" "$bak/docs/specs.md"
+  assert_grep "$t2" "^# AGENTS.md — Navigation map" "$d/AGENTS.md"
+  assert_grep "$t2" "^# Spec Driven Development" "$d/docs/specs.md"
+
+  local t3="collision: --backup=DIR honors a custom backup directory"
+  run_test "$t3"
+  d=$(new_project "collide-custom-dir")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  (cd "$d" && "$INIT" --tool=opencode --backup="$d/keep-old" </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t3: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t3" "^# My own agents rules" "$d/keep-old/AGENTS.md"
+  assert_no_dir "$t3" "$d/harness/backup"
+
+  local t4="collision is tool-aware: AGENTS.md coexists with a claude install"
+  run_test "$t4"
+  d=$(new_project "collide-toolaware")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  (cd "$d" && "$INIT" --tool=claude </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t4: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t4" "^# My own agents rules" "$d/AGENTS.md"
+  assert_no_dir "$t4" "$d/harness/backup"
+  assert_file "$t4" "$d/CLAUDE.md"
+
+  local t5="force: customized CLAUDE.md is backed up, untouched files are not"
+  run_test "$t5"
+  d=$(new_project "force-backup")
+  (cd "$d" && "$INIT" --tool=claude </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t5: first install failed"); return
+  }
+  printf 'my custom note\n' >> "$d/CLAUDE.md"
+  (cd "$d" && "$INIT" --force </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t5: --force failed"); return
+  }
+  PASS=$((PASS + 1))
+  bak="$(find "$d/harness/backup" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  assert_grep "$t5" "my custom note" "$bak/CLAUDE.md"
+  assert_no_grep "$t5" "my custom note" "$d/CLAUDE.md"
+  assert_no_file "$t5" "$bak/AGENTS.md"
+
+  local t6="force on an untouched install creates no backup noise"
+  run_test "$t6"
+  d=$(new_project "force-clean")
+  (cd "$d" && "$INIT" --tool=claude </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t6: first install failed"); return
+  }
+  (cd "$d" && "$INIT" --force </dev/null >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t6: --force failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_no_dir "$t6" "$d/harness/backup"
+
+  local t7="collision prompt: 'n' aborts, 'y' backs up and continues (TTY)"
+  run_test "$t7"
+  d=$(new_project "collide-tty-n")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  # Feed the module menu, architecture picker and audit prompt (all default)
+  # before the collision prompt.
+  if (cd "$d" && printf '\n\n\nn\n' | HARNESS_FORCE_TTY=1 "$INIT" --tool=opencode >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t7: 'n' should abort")
+    return
+  fi
+  PASS=$((PASS + 1))
+  assert_grep "$t7" "^# My own agents rules" "$d/AGENTS.md"
+  assert_no_dir "$t7" "$d/harness"
+
+  d=$(new_project "collide-tty-y")
+  printf '# My own agents rules\n' > "$d/AGENTS.md"
+  (cd "$d" && printf '\n\n\ny\n' | HARNESS_FORCE_TTY=1 "$INIT" --tool=opencode >/dev/null 2>&1) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t7: 'y' should continue"); return
+  }
+  PASS=$((PASS + 1))
+  bak="$(find "$d/harness/backup" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  assert_grep "$t7" "^# My own agents rules" "$bak/AGENTS.md"
+  assert_grep "$t7" "^# AGENTS.md — Navigation map" "$d/AGENTS.md"
+}
+
 test_badge_suggestion() {
   local t="badge suggested when README.md lacks it; never written into the file"
   run_test "$t"
@@ -1349,6 +1459,7 @@ test_update_modules_and_docs
 test_non_tty_no_prompts
 test_force_switch_modules_metadata
 test_badge_suggestion
+test_collision_backup
 
 echo ""
 echo "────────────────────────────────────────"

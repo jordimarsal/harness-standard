@@ -4,11 +4,14 @@
 # Usage:
 #   curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=claude
 #   bash install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update]
-#                   [--modules=m1,m2] [--audit-level=basic|standard|strict]
+#                   [--modules=m1,m2] [--audit-level=basic|standard|strict] [--backup[=DIR]]
 #
 # --update refreshes an installed harness, reusing its stored tool/modules/audit
 # level; without --ref it fetches the newest v* tag (fresh installs stay pinned
 # to the default REF).
+#
+# --backup moves files the install would overwrite (e.g. an existing AGENTS.md)
+# to harness/backup/<UTC>/ instead of aborting; nothing is ever deleted.
 #
 # Env: HARNESS_REPO_URL (default https://github.com/jordimarsal/harness-standard.git)
 #      HARNESS_REF      (default v0.4.1)
@@ -32,9 +35,10 @@ while [ $# -gt 0 ]; do
     --ref)           shift; REF="${1:-}"; REF_GIVEN=1 ;;
     --force)         PASSTHRU+=(--force) ;;
     --update)        UPDATE=1; PASSTHRU+=(--update) ;;
+    --backup|--backup=*) PASSTHRU+=("$1") ;;
     --modules=*|--audit-level=*) PASSTHRU+=("$1") ;;
     -h|--help)
-      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update] [--modules=...] [--audit-level=...]"
+      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update] [--modules=...] [--audit-level=...] [--backup[=DIR]]"
       exit 0 ;;
     *) echo "install.sh: unknown argument: $1" >&2; exit 1 ;;
   esac
