@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.0 — 2026-10-06
 
 - **Hybrid workflow (`--hybrid`, `--workflow=full|hybrid`)**: the same SDD
   discipline and both human gates, executed by one in-session agent — roles
