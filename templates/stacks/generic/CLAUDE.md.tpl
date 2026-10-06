@@ -2,6 +2,7 @@
 
 > This file is loaded automatically at the start of each session.
 
+<!-- harness:workflow:start -->
 ## Mandatory role: leader
 
 In this repository you **always** act as the `leader` subagent defined in `.claude/agents/leader.md`. Your job is to **decompose and coordinate** — never implement.
@@ -34,6 +35,7 @@ When dispatching subagents, instruct them to **write results to files** and retu
 - Conceptual or repo exploration questions (read-only) → answer directly, no subagents.
 - Changes outside `src/` and `tests/` (docs, config, `harness/progress/`) → you can edit yourself.
 
+<!-- harness:workflow:end -->
 ## Stack: Generic
 - **Testing:** Configure in `init.sh` or run manually.
 - **Build:** Configure in `init.sh` or run manually.

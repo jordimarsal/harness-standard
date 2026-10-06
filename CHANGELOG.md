@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Hybrid workflow (`--hybrid`, `--workflow=full|hybrid`)**: the same SDD
+  discipline and both human gates, executed by one in-session agent — roles
+  become modes, and evidence logs (`harness/logs/<feature>/batch-<n>.log`)
+  plus the objective traceability check replace the independent reviewer.
+  The workflow section of the entry file (`AGENTS.md` / `CLAUDE.md`) is now a
+  marked, re-renderable block (`templates/workflow/<tool>/{full,hybrid}.md`);
+  the choice persists in `harness/feature_list.json` (`project.workflow`) and
+  `--update` re-applies it. Escalation rules back to the full dispatch flow
+  are documented in the entry file and `docs/specs.md`.
+
 ## v0.5.0 — 2026-10-06
 
 - **Collision backup (`--backup[=DIR]`)**: installing into a project that

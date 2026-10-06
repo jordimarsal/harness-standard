@@ -16,10 +16,17 @@ gates fix that — but only if they are installed, not just described.
 curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=claude
 # or
 curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=opencode
+# solo repo, same gates, one in-session agent (reviewer becomes an
+# evidence-logged self-review; escalate for risky features):
+curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=opencode --hybrid
 ```
 
 The installer detects your stack, copies the roles, conventions and gates, and
-writes `HARNESS.md` into your repo with the next step.
+writes `HARNESS.md` into your repo with the next step. `--hybrid` (or
+`--workflow=full|hybrid`) selects how features execute — full dispatches
+spec-author/implementer/reviewer subagents; hybrid runs the same SDD flow and
+human gates in one session, with mandatory evidence logs. The choice is stored
+in `harness/feature_list.json` and `--update` keeps it.
 
 Requires `git`. Non-interactive installs (CI, pipes) skip the prompts and use
 defaults: tool `claude`, no optional modules, audit level `basic`.

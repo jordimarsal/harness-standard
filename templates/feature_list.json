@@ -4,6 +4,7 @@
     "parallel": false,
     "modules": [{{MODULES}}],
     "audit_level": "{{AUDIT_LEVEL}}",
+    "workflow": "{{WORKFLOW}}",
     "harness_version": "{{HARNESS_VERSION}}",
     "architecture": "{{ARCHITECTURE}}"
   },

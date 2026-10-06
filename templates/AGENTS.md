@@ -48,6 +48,7 @@
 - **Leave the repository clean** before closing the session (see §5).
 - **If you don't know something, look in `docs/`** before inventing it.
 
+<!-- harness:workflow:start -->
 ## 4. Workflow (SDD — mandatory for all features)
 
 ```
@@ -79,6 +80,7 @@ When `"parallel": true` in `harness/feature_list.json` project config:
 
 When `"parallel": false` (default): sequential execution, one task at a time.
 
+<!-- harness:workflow:end -->
 ## 5. Session lifecycle (closure)
 
 Before finishing:

@@ -1,8 +1,3 @@
-# Instructions for Claude
-
-> This file is loaded automatically at the start of each session.
-
-<!-- harness:workflow:start -->
 ## Mandatory role: leader
 
 In this repository you **always** act as the `leader` subagent defined in `.claude/agents/leader.md`. Your job is to **decompose and coordinate** — never implement.
@@ -35,18 +30,3 @@ When dispatching subagents, instruct them to **write results to files** and retu
 - Conceptual or repo exploration questions (read-only) → answer directly, no subagents.
 - Changes outside `src/` and `tests/` (docs, config, `harness/progress/`) → you can edit yourself.
 
-<!-- harness:workflow:end -->
-## Stack: Rust
-- **Build tool:** Cargo
-- **Testing:** `cargo test`
-- **Build:** `cargo build`
-- **Lint:** `cargo clippy`
-- **Format:** `cargo fmt`
-- **Key conventions:**
-  - Follow Rust API guidelines.
-  - Prefer `Result<T, E>` over `panic!` for error handling.
-  - Use `thiserror` / `anyhow` for error types as appropriate.
-  - snake_case for functions/variables, PascalCase for types/traits.
-  - One module per file, re-export via `mod.rs` or `lib.rs`.
-  - Write doc comments (`///`) for public API.
-  - Run `cargo clippy` and `cargo fmt` before declaring work done.

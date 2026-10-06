@@ -128,6 +128,84 @@ run_test() {  # run_test <name> — echoes header
 
 # ── Tests ──────────────────────────────────────────────
 
+test_hybrid_opencode() {
+  local t="hybrid install renders the hybrid workflow and persists it (opencode)"
+  run_test "$t"
+  local d; d=$(new_project "hybrid-opencode")
+  (cd "$d" && "$INIT" --tool=opencode --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_harness_layout "$t" "$d"
+  assert_grep "$t" "hybrid: one in-session agent, same gates" "$d/AGENTS.md"
+  assert_grep "$t" "Evidence rule" "$d/AGENTS.md"
+  assert_grep "$t" "Escalate to the full dispatch flow" "$d/AGENTS.md"
+  assert_grep "$t" "harness:workflow:start" "$d/AGENTS.md"
+  assert_count "$t" "harness:workflow:start" "$d/AGENTS.md" 1
+  assert_grep "$t" '"workflow": "hybrid"' "$d/harness/feature_list.json"
+  assert_grep "$t" "hybrid" "$d/HARNESS.md"
+  assert_grep "$t" "The hybrid variant" "$d/docs/specs.md"
+}
+
+test_hybrid_persists_through_update() {
+  local t="hybrid survives --update without flags (stored workflow re-applied)"
+  run_test "$t"
+  local d; d=$(new_project "hybrid-update")
+  (cd "$d" && "$INIT" --tool=opencode --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "hybrid: one in-session agent, same gates" "$d/AGENTS.md"
+  assert_grep "$t" '"workflow": "hybrid"' "$d/harness/feature_list.json"
+}
+
+test_hybrid_switch_back_to_full() {
+  local t="--update --workflow=full switches the entry file back to the dispatch flow"
+  run_test "$t"
+  local d; d=$(new_project "hybrid-to-full")
+  (cd "$d" && "$INIT" --tool=opencode --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  (cd "$d" && "$INIT" --update --workflow=full >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "## 4. Workflow (SDD — mandatory for all features)" "$d/AGENTS.md"
+  assert_no_grep "$t" "one in-session agent" "$d/AGENTS.md"
+  assert_grep "$t" '"workflow": "full"' "$d/harness/feature_list.json"
+  assert_count "$t" "harness:workflow:start" "$d/AGENTS.md" 1
+}
+
+test_hybrid_claude() {
+  local t="hybrid install renders the solo full-cycle role (claude)"
+  run_test "$t"
+  local d; d=$(new_project "hybrid-claude")
+  (cd "$d" && "$INIT" --tool=claude --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "Mandatory role: solo full-cycle (hybrid workflow)" "$d/CLAUDE.md"
+  assert_grep "$t" "Evidence rule" "$d/CLAUDE.md"
+  assert_grep "$t" "## Stack: Generic" "$d/CLAUDE.md"
+  assert_no_grep "$t" "always.*act as the .leader. subagent" "$d/CLAUDE.md"
+  assert_grep "$t" '"workflow": "hybrid"' "$d/harness/feature_list.json"
+}
+
+test_hybrid_invalid_workflow_rejected() {
+  local t="invalid --workflow value aborts the install"
+  run_test "$t"
+  local d; d=$(new_project "hybrid-bogus")
+  if (cd "$d" && "$INIT" --tool=opencode --workflow=bogus >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh accepted --workflow=bogus")
+    return
+  fi
+  PASS=$((PASS + 1))
+  assert_no_file "$t" "$d/AGENTS.md"
+  assert_no_dir "$t" "$d/harness"
+}
 test_claude_mode_typescript() {
   local t="claude mode installs CLAUDE.md + .claude at root, rest in harness/"
   run_test "$t"
@@ -1460,6 +1538,11 @@ test_non_tty_no_prompts
 test_force_switch_modules_metadata
 test_badge_suggestion
 test_collision_backup
+test_hybrid_opencode
+test_hybrid_persists_through_update
+test_hybrid_switch_back_to_full
+test_hybrid_claude
+test_hybrid_invalid_workflow_rejected
 
 echo ""
 echo "────────────────────────────────────────"

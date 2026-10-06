@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--hybrid|--workflow=full|hybrid] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -77,6 +77,7 @@ REMOVE_MODULES_FLAG=""
 ARCH_FLAG=""
 REMOVED_MODULES=()
 AUDIT_LEVEL=""
+WORKFLOW_FLAG=""
 for arg in "$@"; do
   case "$arg" in
     --tool=claude)   TOOL="claude" ;;
@@ -90,6 +91,8 @@ for arg in "$@"; do
     --remove-modules=*) REMOVE_MODULES_FLAG="${arg#--remove-modules=}" ;;
     --architecture=*) ARCH_FLAG="${arg#--architecture=}" ;;
     --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
+    --hybrid)        WORKFLOW_FLAG="hybrid" ;;
+    --workflow=*)    WORKFLOW_FLAG="${arg#--workflow=}" ;;
     *)
       fail "Unknown argument: $arg"
       fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]"
@@ -116,6 +119,26 @@ if [ -n "$AUDIT_LEVEL" ]; then
       exit 1
       ;;
   esac
+fi
+
+# ── Workflow selection ─────────────────────────────────
+# full (default): leader dispatches spec-author/implementer/reviewer subagents.
+# hybrid: the same SDD discipline and human gates, executed by one in-session
+# agent — roles become modes, evidence logs replace dispatches (see the
+# workflow section of the installed entry file).
+WORKFLOW="full"
+if [ -n "$WORKFLOW_FLAG" ]; then
+  case "$WORKFLOW_FLAG" in
+    full|hybrid) WORKFLOW="$WORKFLOW_FLAG" ;;
+    *)
+      fail "Invalid --workflow value: $WORKFLOW_FLAG (use full|hybrid, or --hybrid)"
+      exit 1
+      ;;
+  esac
+fi
+if [ "$WORKFLOW" = "hybrid" ] && ! command -v python3 >/dev/null 2>&1; then
+  fail "--hybrid requires python3 (it re-renders the workflow section of the entry file)."
+  exit 1
 fi
 
 # ── --update: preload stored config from the installed harness ──
@@ -186,6 +209,22 @@ if [ "$UPDATE" -eq 1 ]; then
       "") AUDIT_LEVEL="basic" ;;
       *)
         fail "Stored audit_level '$AUDIT_LEVEL' is invalid — fix harness/feature_list.json or pass --audit-level=basic|standard|strict."
+        exit 1
+        ;;
+    esac
+  fi
+  if [ -z "$WORKFLOW_FLAG" ]; then
+    WORKFLOW="$(sed -n 's/.*"workflow"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' harness/feature_list.json | head -n 1)"
+    case "$WORKFLOW" in
+      full|hybrid) info "Update: re-applying stored workflow: $WORKFLOW" ;;
+      *) WORKFLOW="full" ;;
+    esac
+  else
+    WORKFLOW="$WORKFLOW_FLAG"
+    case "$WORKFLOW" in
+      full|hybrid) ;;
+      *)
+        fail "Invalid --workflow value: $WORKFLOW (use full|hybrid, or --hybrid)"
         exit 1
         ;;
     esac
@@ -537,6 +576,33 @@ agents_dir_differs() {  # agents_dir_differs <dir> <tool> — any installed agen
   return 1
 }
 
+# entry_differs_beyond_workflow <entry> <tpl> — exit 0 when <entry> differs
+# from <tpl> beyond the marked workflow block. The block's inner text is
+# installer-rendered (--hybrid/--workflow), so a difference there is not a
+# user customization and must not trigger a backup.
+entry_differs_beyond_workflow() {
+  local entry="$1" tpl="$2" rc=0
+  # Missing files have nothing to back up (matches the original cmp logic:
+  # both files had to exist for a difference to be possible).
+  if [ ! -f "$entry" ] || [ ! -f "$tpl" ]; then return 1; fi
+  if cmp -s "$entry" "$tpl"; then return 1; fi
+  if ! command -v python3 >/dev/null 2>&1; then return 0; fi
+  python3 - "$entry" "$tpl" <<'PY' || rc=$?
+import sys
+START = "<!-- harness:workflow:start -->"
+END = "<!-- harness:workflow:end -->"
+def canon(p):
+    t = open(p, encoding="utf-8").read()
+    i, j = t.find(START), t.find(END)
+    if i == -1 or j == -1:
+        return t
+    return t[:i + len(START)] + t[j:]
+sys.exit(0 if canon(sys.argv[1]) == canon(sys.argv[2]) else 7)
+PY
+  if [ "$rc" -ne 0 ]; then return 0; fi
+  return 1
+}
+
 refresh_tool_files() {  # refresh_tool_files <tool> — back up customized files, then remove the tool's files
   local t="$1" entry cfg adir tpl
   if [ "$t" = "claude" ]; then
@@ -545,7 +611,7 @@ refresh_tool_files() {  # refresh_tool_files <tool> — back up customized files
     entry="AGENTS.md"; cfg="opencode.json"; adir=".opencode/agent"
   fi
   tpl="$(entry_tpl "$t")"
-  if [ -f "$entry" ] && [ -f "$tpl" ] && ! cmp -s "$entry" "$tpl"; then
+  if entry_differs_beyond_workflow "$entry" "$tpl"; then
     backup_collision "$entry"
   fi
   if tool_config_differs "$t"; then
@@ -799,11 +865,50 @@ refresh_project_metadata() {  # refresh_project_metadata <feature-list>
   else
     warn "Could not update 'audit_level' in $fl — set it manually in the project section."
   fi
+  if grep -q '"workflow"[[:space:]]*:' "$fl"; then
+    sed "s|\"workflow\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"workflow\": \"$WORKFLOW\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
+  else
+    # Pre-workflow install: add the field right after audit_level.
+    sed "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"|\"audit_level\": \"\1\",\n    \"workflow\": \"$WORKFLOW\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
+  fi
   if grep -q '"harness_version"[[:space:]]*:' "$fl"; then
     sed "s|\"harness_version\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"harness_version\": \"$HARNESS_VERSION\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
   else
     # Pre-versioning install: add the stamp as the last project property.
     sed "s|\"audit_level\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"|\"audit_level\": \"\1\",\n    \"harness_version\": \"$HARNESS_VERSION\"|" "$fl" > "$fl.tmp" && mv "$fl.tmp" "$fl"
+  fi
+}
+
+# ── Workflow section rendering ─────────────────────────
+# The entry file (CLAUDE.md / AGENTS.md) carries a marked workflow block
+# (<!-- harness:workflow:start/end -->). render swaps the block's inner text
+# for the selected mode's content, keeping the markers so a later --update
+# can re-render. Requires python3 when hybrid (checked at arg validation).
+render_workflow() {  # render_workflow <entry-file>
+  local file="$1"
+  local block="$TEMPLATES_DIR/workflow/$TOOL/$WORKFLOW.md"
+  [ -f "$file" ] || return 0
+  if [ ! -f "$block" ]; then
+    warn "No workflow template for tool '$TOOL' mode '$WORKFLOW' — entry file left as installed."
+    return 0
+  fi
+  local rc=0
+  WORKFLOW_BLOCK="$block" python3 - "$file" <<'PY' || rc=$?
+import os, sys
+path = sys.argv[1]
+block = open(os.environ["WORKFLOW_BLOCK"], encoding="utf-8").read().strip()
+START = "<!-- harness:workflow:start -->"
+END = "<!-- harness:workflow:end -->"
+text = open(path, encoding="utf-8").read()
+i, j = text.find(START), text.find(END)
+if i == -1 or j == -1:
+    sys.exit(3)
+open(path, "w", encoding="utf-8").write(text[:i + len(START)] + "\n" + block + "\n" + text[j:])
+PY
+  if [ "$rc" -ne 0 ]; then
+    warn "No marked workflow block found in $file — workflow '$WORKFLOW' not rendered."
+  elif [ "$WORKFLOW" = "hybrid" ]; then
+    ok "Workflow: hybrid (one in-session agent; same human gates; evidence logs in harness/logs/)"
   fi
 }
 
@@ -892,6 +997,7 @@ if [ ! -f "harness/feature_list.json" ]; then
   sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
       -e "s|{{MODULES}}|$MODULES_JSON|g" \
       -e "s|{{AUDIT_LEVEL}}|$AUDIT_LEVEL|g" \
+      -e "s|{{WORKFLOW}}|$WORKFLOW|g" \
       -e "s|{{HARNESS_VERSION}}|$HARNESS_VERSION|g" \
       -e "s|{{ARCHITECTURE}}|${ARCH_NAME:-}|g" \
       "$TEMPLATES_DIR/feature_list.json" > harness/feature_list.json
@@ -930,6 +1036,7 @@ if [ "$TOOL" = "claude" ]; then
   else
     cp "$TEMPLATES_DIR/stacks/generic/CLAUDE.md.tpl" ./CLAUDE.md
   fi
+  render_workflow "./CLAUDE.md"
 else
   mkdir -p .opencode/agent
   for agent in leader spec-author implementer reviewer; do
@@ -941,6 +1048,7 @@ else
       "$TEMPLATES_DIR/opencode.json" > opencode.json
 
   cp "$TEMPLATES_DIR/AGENTS.md" ./AGENTS.md
+  render_workflow "./AGENTS.md"
 fi
 
 ok "Templates installed"
@@ -1078,6 +1186,10 @@ if [ $EXIT_CODE -eq 0 ]; then
     ROLES_DIR=".opencode/agent/"
   fi
 
+  WORKFLOW_NOTE=""
+  if [ "$WORKFLOW" = "hybrid" ]; then
+    WORKFLOW_NOTE=" — one in-session agent; same human gates; evidence logs in harness/logs/ (see the workflow section of $ENTRY_FILE)"
+  fi
   cat > HARNESS.md <<EOF
 # Harness — $PROJECT_NAME
 
@@ -1085,6 +1197,7 @@ Installed with [harness-standard](https://github.com/jordimarsal/harness-standar
 
 - **Stack detected:** $STACK
 - **Architecture:** ${ARCH_NAME:-generic template}
+- **Workflow:** $WORKFLOW$WORKFLOW_NOTE
 - **Roles:** Leader · Spec Author · Implementer · Reviewer (\`$ROLES_DIR\`)
 - **Gates:** \`harness/CHECKPOINTS.md\` · \`docs/verification.md\`
 - **Process:** \`docs/specs.md\` — Spec-Driven Development with a human approval gate
