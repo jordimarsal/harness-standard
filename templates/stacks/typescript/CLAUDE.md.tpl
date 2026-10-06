@@ -46,3 +46,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
   - Descriptive names, verbs for methods.
   - Comments only when code is not self-explanatory.
   - ESLint + Prettier enforced.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

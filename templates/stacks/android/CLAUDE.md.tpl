@@ -48,3 +48,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
   - Use `androidx` libraries.
   - No hardcoded strings — use resource files.
   - Min SDK and target SDK as specified in build.gradle.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

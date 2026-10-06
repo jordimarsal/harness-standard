@@ -28,6 +28,11 @@ spec-author/implementer/reviewer subagents; hybrid runs the same SDD flow and
 human gates in one session, with mandatory evidence logs. The choice is stored
 in `harness/feature_list.json` and `--update` keeps it.
 
+Project-specific additions to the entry file (`CLAUDE.md` / `AGENTS.md`) go
+inside the `harness:project` block at the end of the file: the installer
+preserves that block verbatim across `--update`/`--force` and never counts it
+as a customization, so routine updates create no backup noise.
+
 Requires `git`. Non-interactive installs (CI, pipes) skip the prompts and use
 defaults: tool `claude`, no optional modules, audit level `basic`.
 

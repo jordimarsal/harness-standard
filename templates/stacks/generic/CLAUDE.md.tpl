@@ -40,3 +40,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
 - **Testing:** Configure in `init.sh` or run manually.
 - **Build:** Configure in `init.sh` or run manually.
 - **Key conventions:** Define project-specific conventions in `docs/conventions.md`.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Project block (`harness:project`)**: the entry file (`CLAUDE.md` /
+  `AGENTS.md`) ends with a marked, project-owned block. `--update`/`--force`
+  preserve its content verbatim when regenerating the file, and the collision
+  comparison ignores it — project-specific mandatory steps and map rows live
+  in the auto-loaded entry file without turning routine updates into backup
+  noise.
+
 ## v0.6.0 — 2026-10-06
 
 - **Hybrid workflow (`--hybrid`, `--workflow=full|hybrid`)**: the same SDD

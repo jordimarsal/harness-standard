@@ -54,3 +54,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
   - **Tests:** AssertJ fluent form (`hasSize`, `containsKeys`, `containsEntry`, `hasSameHashCodeAs`, `hasToString`) instead of `.size()`/`.keySet()`/`.hashCode()` intermediates; no `Thread.sleep` or `try { … } catch (…) { fail(…); }` — use **Awaitility**; repeated reject/accept cases → `@ParameterizedTest` + `@ValueSource`; hoist constant / heavy strings (e.g. `"x".repeat(129)`, `URI.create(...)`, `Duration.of(...)`) out of lambdas.
   - **Docker:** pin base images by **digest**, not floating tags (`eclipse-temurin@sha256:…`).
   - **Static analysis:** the project is scanned by SonarQube (rules surface as `java:S<nnn>` / `docker:S<nnn>`). Follow the above proactively so the CI gate stays green without a cleanup pass; fix at the source, never suppress the rule.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

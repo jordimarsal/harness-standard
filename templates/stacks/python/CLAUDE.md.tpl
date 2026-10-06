@@ -83,3 +83,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
 - **Performance and safety:**
   - No O(N²) scans in hot paths; index or cache instead.
   - No embedded secrets; no network calls unless explicitly required; keep behavior deterministic.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

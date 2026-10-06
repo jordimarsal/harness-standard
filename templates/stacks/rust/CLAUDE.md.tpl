@@ -50,3 +50,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
   - One module per file, re-export via `mod.rs` or `lib.rs`.
   - Write doc comments (`///`) for public API.
   - Run `cargo clippy` and `cargo fmt` before declaring work done.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

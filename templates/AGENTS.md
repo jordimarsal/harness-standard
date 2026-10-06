@@ -95,3 +95,6 @@ Before finishing:
 
 - Re-read the relevant section of `docs/`.
 - If a tool doesn't behave as expected, **do not invent a workaround**: document the block in `harness/progress/current.md` and stop the session.
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->

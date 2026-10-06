@@ -206,6 +206,101 @@ test_hybrid_invalid_workflow_rejected() {
   assert_no_file "$t" "$d/AGENTS.md"
   assert_no_dir "$t" "$d/harness"
 }
+
+test_project_block_fresh_install_empty() {
+  local t="fresh install ships an empty marked project block"
+  run_test "$t"
+  local d; d=$(new_project "projblock-fresh")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "harness:project:start" "$d/AGENTS.md"
+  assert_grep "$t" "harness:project:end" "$d/AGENTS.md"
+}
+
+test_project_block_preserved_on_update() {
+  local t="--update preserves project-block content verbatim (opencode + claude)"
+  run_test "$t"
+  local d; d=$(new_project "projblock-update")
+  (cd "$d" && "$INIT" --tool=opencode --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  # Simulate project-owned additions inside the marked block.
+  python3 - "$d/AGENTS.md" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+s, e = "<!-- harness:project:start -->", "<!-- harness:project:end -->"
+t = t.replace(e, "\n## 0. Project mandate\n\nRead CONTRACTS.md before any work.\n" + e, 1)
+open(p, "w", encoding="utf-8").write(t)
+PY
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "Read CONTRACTS.md before any work" "$d/AGENTS.md"
+  assert_grep "$t" "hybrid: one in-session agent, same gates" "$d/AGENTS.md"
+  assert_count "$t" "harness:project:start" "$d/AGENTS.md" 1
+
+  local dc; dc=$(new_project "projblock-claude")
+  (cd "$dc" && "$INIT" --tool=claude >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: claude install failed"); return
+  }
+  python3 - "$dc/CLAUDE.md" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+s, e = "<!-- harness:project:start -->", "<!-- harness:project:end -->"
+t = t.replace(e, "\nProject rule: run bash scripts/check.sh before any commit.\n" + e, 1)
+open(p, "w", encoding="utf-8").write(t)
+PY
+  (cd "$dc" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: claude update failed"); return
+  }
+  assert_grep "$t" "bash scripts/check.sh before any commit" "$dc/CLAUDE.md"
+}
+
+test_project_block_no_backup_noise() {
+  local t="--update with project-block-only edits creates no harness/backup"
+  run_test "$t"
+  local d; d=$(new_project "projblock-silent")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  python3 - "$d/AGENTS.md" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+t = t.replace("<!-- harness:project:end -->",
+              "\nMap row: js/ — application code.\n<!-- harness:project:end -->", 1)
+open(p, "w", encoding="utf-8").write(t)
+PY
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_no_dir "$t" "$d/harness/backup"
+  assert_grep "$t" "js/ — application code" "$d/AGENTS.md"
+}
+
+test_project_block_outside_edits_backed_up() {
+  local t="edits outside the managed blocks are still treated as customizations"
+  run_test "$t"
+  local d; d=$(new_project "projblock-outside")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: install failed"); return
+  }
+  printf '\nMy own stray note.\n' >> "$d/AGENTS.md"
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_dir "$t" "$d/harness/backup"
+  assert_no_grep "$t" "My own stray note" "$d/AGENTS.md"
+  assert_grep "$t" "My own stray note" "$(ls -d "$d"/harness/backup/*/ | head -n 1)/AGENTS.md"
+}
+
 test_claude_mode_typescript() {
   local t="claude mode installs CLAUDE.md + .claude at root, rest in harness/"
   run_test "$t"
@@ -1543,6 +1638,10 @@ test_hybrid_persists_through_update
 test_hybrid_switch_back_to_full
 test_hybrid_claude
 test_hybrid_invalid_workflow_rejected
+test_project_block_preserved_on_update
+test_project_block_no_backup_noise
+test_project_block_outside_edits_backed_up
+test_project_block_fresh_install_empty
 
 echo ""
 echo "────────────────────────────────────────"

@@ -127,6 +127,10 @@ fi
 # agent — roles become modes, evidence logs replace dispatches (see the
 # workflow section of the installed entry file).
 WORKFLOW="full"
+# Snapshot dir for entry files: --force/--update preserve the project block
+# they carry (preserve_project_block); fresh installs never populate it.
+ENTRY_SNAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/harness-entry-snap.XXXXXX")"
+trap 'rm -rf "$ENTRY_SNAP_DIR"' EXIT
 if [ -n "$WORKFLOW_FLAG" ]; then
   case "$WORKFLOW_FLAG" in
     full|hybrid) WORKFLOW="$WORKFLOW_FLAG" ;;
@@ -577,9 +581,9 @@ agents_dir_differs() {  # agents_dir_differs <dir> <tool> — any installed agen
 }
 
 # entry_differs_beyond_workflow <entry> <tpl> — exit 0 when <entry> differs
-# from <tpl> beyond the marked workflow block. The block's inner text is
-# installer-rendered (--hybrid/--workflow), so a difference there is not a
-# user customization and must not trigger a backup.
+# from <tpl> beyond the installer-managed marked blocks (workflow render,
+# project block). Differences inside those blocks are generated or
+# project-owned, not customizations, and must not trigger a backup.
 entry_differs_beyond_workflow() {
   local entry="$1" tpl="$2" rc=0
   # Missing files have nothing to back up (matches the original cmp logic:
@@ -589,14 +593,17 @@ entry_differs_beyond_workflow() {
   if ! command -v python3 >/dev/null 2>&1; then return 0; fi
   python3 - "$entry" "$tpl" <<'PY' || rc=$?
 import sys
-START = "<!-- harness:workflow:start -->"
-END = "<!-- harness:workflow:end -->"
+MANAGED = [
+    ("<!-- harness:workflow:start -->", "<!-- harness:workflow:end -->"),
+    ("<!-- harness:project:start -->", "<!-- harness:project:end -->"),
+]
 def canon(p):
     t = open(p, encoding="utf-8").read()
-    i, j = t.find(START), t.find(END)
-    if i == -1 or j == -1:
-        return t
-    return t[:i + len(START)] + t[j:]
+    for s, e in MANAGED:
+        i, j = t.find(s), t.find(e)
+        if i != -1 and j != -1:
+            t = t[:i + len(s)] + t[j:]
+    return t
 sys.exit(0 if canon(sys.argv[1]) == canon(sys.argv[2]) else 7)
 PY
   if [ "$rc" -ne 0 ]; then return 0; fi
@@ -626,6 +633,12 @@ refresh_tool_files() {  # refresh_tool_files <tool> — back up customized files
 
 if [ "$FORCE" -eq 1 ]; then
   if [ -z "$BACKUP_DIR" ]; then BACKUP_DIR="$(default_backup_dir)"; fi
+  # Snapshot entry files before refresh: the project block they carry is
+  # spliced into the regenerated file (preserve_project_block) so a routine
+  # --update/--force never turns project additions into backup noise.
+  for _e in AGENTS.md CLAUDE.md; do
+    if [ -f "$_e" ]; then cp "$_e" "${ENTRY_SNAP_DIR}/$_e"; fi
+  done
   # Both tool namespaces: customized files are backed up, generated ones are
   # replaced in place — switching tools also cleans the previous tool's files.
   refresh_tool_files claude
@@ -879,6 +892,41 @@ refresh_project_metadata() {  # refresh_project_metadata <feature-list>
   fi
 }
 
+# ── Project block preservation ─────────────────────────
+# The entry file ends with a marked project block (harness:project). It is
+# project-owned: preserve_project_block splices its content from the
+# pre-update snapshot into the freshly copied template, and the collision
+# comparison ignores it — project additions never become backup noise.
+preserve_project_block() {  # preserve_project_block <new-entry> <old-snapshot>
+  local new="$1" old="$2" rc=0
+  [ -f "$new" ] && [ -f "$old" ] || return 0
+  command -v python3 >/dev/null 2>&1 || { warn "python3 not available — project block not preserved."; return 0; }
+  PROJECT_OLD="$old" python3 - "$new" <<'PY' || rc=$?
+import os, sys
+START = "<!-- harness:project:start -->"
+END = "<!-- harness:project:end -->"
+old = open(os.environ["PROJECT_OLD"], encoding="utf-8").read()
+ni, nj = old.find(START), old.find(END)
+if ni == -1 or nj == -1:
+    sys.exit(0)  # old file carried no project block
+content = old[ni + len(START):nj].strip("\n")
+if not content.strip():
+    sys.exit(0)  # nothing project-owned to preserve
+new_path = sys.argv[1]
+text = open(new_path, encoding="utf-8").read()
+a, b = text.find(START), text.find(END)
+if a == -1 or b == -1:
+    sys.exit(4)  # new template has no block — report
+kept = START + "\n" + content + "\n" + END + "\n"
+open(new_path, "w", encoding="utf-8").write(text[:a] + kept + text[b + len(END):])
+PY
+  if [ "$rc" -eq 4 ]; then
+    warn "New entry template has no project block — content from $old not re-inserted."
+  elif [ "$rc" -eq 0 ]; then
+    ok "Project block preserved from previous entry file"
+  fi
+}
+
 # ── Workflow section rendering ─────────────────────────
 # The entry file (CLAUDE.md / AGENTS.md) carries a marked workflow block
 # (<!-- harness:workflow:start/end -->). render swaps the block's inner text
@@ -1037,6 +1085,7 @@ if [ "$TOOL" = "claude" ]; then
     cp "$TEMPLATES_DIR/stacks/generic/CLAUDE.md.tpl" ./CLAUDE.md
   fi
   render_workflow "./CLAUDE.md"
+  preserve_project_block "./CLAUDE.md" "${ENTRY_SNAP_DIR}/CLAUDE.md"
 else
   mkdir -p .opencode/agent
   for agent in leader spec-author implementer reviewer; do
@@ -1049,6 +1098,7 @@ else
 
   cp "$TEMPLATES_DIR/AGENTS.md" ./AGENTS.md
   render_workflow "./AGENTS.md"
+  preserve_project_block "./AGENTS.md" "${ENTRY_SNAP_DIR}/AGENTS.md"
 fi
 
 ok "Templates installed"
@@ -1206,6 +1256,9 @@ Installed with [harness-standard](https://github.com/jordimarsal/harness-standar
 
 1. Edit \`docs/architecture.md\` and \`docs/conventions.md\` for this project.
 2. Add features to \`harness/feature_list.json\`.
+3. Project-specific additions to $ENTRY_FILE (mandatory steps, map rows) go
+   inside the \`harness:project\` block at the end of the file — preserved
+   verbatim on --update.
 3. Start the leader: \`$TOOL\`
 4. Update later: re-run install.sh with \`--update\` (keeps specs, progress and settings).
 

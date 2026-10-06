@@ -42,3 +42,6 @@ When dispatching subagents, instruct them to **write results to files** and retu
 - **Testing:** `npm test`
 - **Build:** `npm run build`
 - **Dev server:** `npm run dev`
+
+<!-- harness:project:start -->
+<!-- harness:project:end -->
