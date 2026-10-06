@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1 — 2026-10-06
+
+- **fix(updates)**: blank-line runs around the managed blocks (workflow,
+  project) no longer read as a customization — a real heredoc append next to a
+  template with a leading blank line used to trigger a spurious backup.
+
 ## v0.7.0 — 2026-10-06
 
 - **Project block (`harness:project`)**: the entry file (`CLAUDE.md` /

@@ -592,7 +592,7 @@ entry_differs_beyond_workflow() {
   if cmp -s "$entry" "$tpl"; then return 1; fi
   if ! command -v python3 >/dev/null 2>&1; then return 0; fi
   python3 - "$entry" "$tpl" <<'PY' || rc=$?
-import sys
+import re, sys
 MANAGED = [
     ("<!-- harness:workflow:start -->", "<!-- harness:workflow:end -->"),
     ("<!-- harness:project:start -->", "<!-- harness:project:end -->"),
@@ -603,7 +603,9 @@ def canon(p):
         i, j = t.find(s), t.find(e)
         if i != -1 and j != -1:
             t = t[:i + len(s)] + t[j:]
-    return t
+    # Blank-line runs around the managed blocks vary with how the content was
+    # appended (heredoc vs template); they are not customizations.
+    return re.sub(r"\n{2,}", "\n", t)
 sys.exit(0 if canon(sys.argv[1]) == canon(sys.argv[2]) else 7)
 PY
   if [ "$rc" -ne 0 ]; then return 0; fi

@@ -272,6 +272,8 @@ test_project_block_no_backup_noise() {
 import sys
 p = sys.argv[1]
 t = open(p, encoding="utf-8").read()
+# the leading blank line mimics a real heredoc append — blank-line runs
+# around the managed blocks must not read as a customization
 t = t.replace("<!-- harness:project:end -->",
               "\nMap row: js/ — application code.\n<!-- harness:project:end -->", 1)
 open(p, "w", encoding="utf-8").write(t)
