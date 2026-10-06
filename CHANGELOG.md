@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-10-06
+## v0.5.0 — 2026-10-06
 
 - **Collision backup (`--backup[=DIR]`)**: installing into a project that
   already owns files the harness would write (`AGENTS.md`, `CLAUDE.md`,
@@ -18,6 +18,8 @@
   creates no backup noise), and a tool switch still cleans the previous
   tool's files. The refusal check is now `harness/`-only; foreign
   `.claude/`/`.opencode/` content no longer blocks a fresh install.
+- Fresh installs now default to `v0.5.0` (installer REF pin); `package.json`
+  version aligned to the release.
 
 ## v0.4.1 — 2026-10-06
 

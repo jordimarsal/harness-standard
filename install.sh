@@ -14,11 +14,11 @@
 # to harness/backup/<UTC>/ instead of aborting; nothing is ever deleted.
 #
 # Env: HARNESS_REPO_URL (default https://github.com/jordimarsal/harness-standard.git)
-#      HARNESS_REF      (default v0.4.1)
+#      HARNESS_REF      (default v0.5.0)
 set -euo pipefail
 
 REPO_URL="${HARNESS_REPO_URL:-https://github.com/jordimarsal/harness-standard.git}"
-REF="${HARNESS_REF:-v0.4.1}"
+REF="${HARNESS_REF:-v0.5.0}"
 REF_GIVEN=0
 UPDATE=0
 DEST="."
