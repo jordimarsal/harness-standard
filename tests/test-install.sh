@@ -81,6 +81,15 @@ assert_no_dir() {  # assert_no_dir <name> <path>
   fi
 }
 
+assert_no_grep() {  # assert_no_grep <name> <pattern> <file>
+  if ! grep -q "$2" "$3" 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1: pattern '$2' should not be in $3")
+    echo "    FAIL: pattern '$2' found in $3 (expected absent)"
+  fi
+}
+
 # ── Shared layout assertions (everything except docs/ under harness/) ──
 assert_harness_layout() {  # assert_harness_layout <test-name> <project-dir>
   local t="$1" d="$2"
@@ -1255,6 +1264,49 @@ test_non_tty_no_prompts() {
   assert_grep "$t2" '"audit_level": "standard"' "$d/harness/feature_list.json"
 }
 
+test_badge_suggestion() {
+  local t="badge suggested when README.md lacks it; never written into the file"
+  run_test "$t"
+
+  # README without the badge → suggestion on stdout, file untouched.
+  local d; d=$(new_project "badge-missing")
+  printf '# My Project\n\nSome intro text.\n' > "$d/README.md"
+  local out
+  out="$(cd "$d" && "$INIT" --tool=opencode </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_grep "$t" "Tip: consider adding the badge" "$d/init-output.txt"
+  assert_grep "$t" "raw.githubusercontent.com/jordimarsal/harness-standard/main/assets/badge.svg" "$d/init-output.txt"
+  assert_grep "$t" "^# My Project" "$d/README.md"
+  assert_no_grep "$t" "badge.svg" "$d/README.md"
+
+  # README already badged → no suggestion (idempotent across --update).
+  local t2="badge already present → no suggestion"
+  run_test "$t2"
+  d=$(new_project "badge-present")
+  printf '# My Project\n\n[![built with harness-standard](https://raw.githubusercontent.com/jordimarsal/harness-standard/main/assets/badge.svg)](https://github.com/jordimarsal/harness-standard)\n' > "$d/README.md"
+  out="$(cd "$d" && "$INIT" --tool=opencode </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t2: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_count "$t2" "Tip: consider adding the badge" "$d/init-output.txt" 0
+
+  # No README at all → no suggestion, no failure.
+  local t3="no README → no badge suggestion"
+  run_test "$t3"
+  d=$(new_project "badge-no-readme")
+  out="$(cd "$d" && "$INIT" --tool=opencode </dev/null 2>&1)" || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t3: init.sh exited non-zero"); return
+  }
+  PASS=$((PASS + 1))
+  printf '%s\n' "$out" > "$d/init-output.txt"
+  assert_count "$t3" "Tip: consider adding the badge" "$d/init-output.txt" 0
+  assert_no_file "$t3" "$d/README.md"
+}
+
 # ── Main ───────────────────────────────────────────────
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/harness-test-XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -1296,6 +1348,7 @@ test_architecture_selection
 test_update_modules_and_docs
 test_non_tty_no_prompts
 test_force_switch_modules_metadata
+test_badge_suggestion
 
 echo ""
 echo "────────────────────────────────────────"

@@ -938,6 +938,13 @@ First prompt:
 > Read $ENTRY_FILE and start the leader workflow. Pick the first pending feature.
 EOF
 
+  # Badge suggestion — README.md is user-owned: suggest, never write.
+  if [ -f README.md ] && ! grep -q "built with harness-standard" README.md; then
+    echo ""
+    echo "Tip: consider adding the badge to README.md (variants: harness-standard README, Badge section):"
+    echo '  [![built with harness-standard](https://raw.githubusercontent.com/jordimarsal/harness-standard/main/assets/badge.svg)](https://github.com/jordimarsal/harness-standard)'
+  fi
+
   echo ""
   echo "Next: $TOOL — open $TOOL, then prompt: Read $ENTRY_FILE and start the leader workflow."
 else
