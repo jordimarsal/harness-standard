@@ -1,0 +1,248 @@
+{
+ "generatedAt": "2026-10-07T08:10:51+00:00",
+ "server": "https://sonar.viatgecio.test",
+ "project": {
+  "key": "jordimarsal:harness-standard",
+  "name": "jordimarsal:harness-standard",
+  "dashboard": "https://sonar.viatgecio.test/dashboard?id=jordimarsal%3Aharness-standard"
+ },
+ "qualityGate": {
+  "name": "Viatgecio Way",
+  "error": null,
+  "status": "OK",
+  "ignoredConditions": false,
+  "period": {
+   "mode": "PREVIOUS_VERSION",
+   "date": "2026-10-07T07:17:31+0000"
+  },
+  "caycStatus": "non-compliant",
+  "conditions": [
+   {
+    "metric": "new_violations",
+    "comparator": "GT",
+    "threshold": "0",
+    "actual": "0",
+    "status": "OK"
+   }
+  ]
+ },
+ "measures": {
+  "complexity": 199,
+  "duplicated_lines_density": 0.0,
+  "duplicated_lines": 0,
+  "functions": 31,
+  "new_vulnerabilities": 0,
+  "classes": 2,
+  "statements": 485,
+  "sqale_index": 167,
+  "sqale_rating": 1.0,
+  "bugs": 0,
+  "new_violations": 0,
+  "ncloc": 646,
+  "new_maintainability_rating": 1.0,
+  "coverage": 0.0,
+  "reliability_rating": 1.0,
+  "code_smells": 11,
+  "security_rating": 2.0,
+  "violations": 12,
+  "comment_lines_density": 8.8,
+  "security_hotspots": 0,
+  "new_bugs": 0,
+  "new_code_smells": 0,
+  "new_security_hotspots": 0,
+  "comment_lines": 62,
+  "cognitive_complexity": 286,
+  "files": 7,
+  "vulnerabilities": 1
+ },
+ "measuresError": null,
+ "issues": {
+  "total": 12,
+  "returned": 12,
+  "items": [
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/modules/project-scanner/scan.py",
+    "line": 94,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.",
+    "effort": "6min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T08:12:00+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/modules/project-scanner/scan.py",
+    "line": 288,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 31 to the 15 allowed.",
+    "effort": "21min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T12:54:28+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/tools/check-traceability.py",
+    "line": 42,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed.",
+    "effort": "12min",
+    "status": "OPEN",
+    "creationDate": "2026-10-04T15:36:29+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/tools/check-traceability.py",
+    "line": 74,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.",
+    "effort": "8min",
+    "status": "OPEN",
+    "creationDate": "2026-10-04T18:48:33+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/tools/check-traceability.py",
+    "line": 168,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed.",
+    "effort": "19min",
+    "status": "OPEN",
+    "creationDate": "2026-10-04T15:36:29+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S3776",
+    "severity": "CRITICAL",
+    "type": "CODE_SMELL",
+    "file": "templates/tools/validate-feature-list.py",
+    "line": 24,
+    "message": "Refactor this function to reduce its Cognitive Complexity from 90 to the 15 allowed.",
+    "effort": "1h20min",
+    "status": "OPEN",
+    "creationDate": "2026-09-28T12:36:00+0000",
+    "tags": [
+     "brain-overload"
+    ]
+   },
+   {
+    "rule": "python:S5914",
+    "severity": "MAJOR",
+    "type": "CODE_SMELL",
+    "file": "evals-fixtures/01-traceability-clean/project/tests/test_cart.py",
+    "line": 2,
+    "message": "Replace this expression; its boolean value is constant.",
+    "effort": "5min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T13:22:03+0000",
+    "tags": [
+     "tests",
+     "confusing",
+     "suspicious"
+    ]
+   },
+   {
+    "rule": "python:S5914",
+    "severity": "MAJOR",
+    "type": "CODE_SMELL",
+    "file": "evals-fixtures/01-traceability-clean/project/tests/test_cart.py",
+    "line": 6,
+    "message": "Replace this expression; its boolean value is constant.",
+    "effort": "5min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T13:22:03+0000",
+    "tags": [
+     "tests",
+     "confusing",
+     "suspicious"
+    ]
+   },
+   {
+    "rule": "python:S5914",
+    "severity": "MAJOR",
+    "type": "CODE_SMELL",
+    "file": "evals-fixtures/02-traceability-gap/project/tests/test_cart.py",
+    "line": 2,
+    "message": "Replace this expression; its boolean value is constant.",
+    "effort": "5min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T13:22:03+0000",
+    "tags": [
+     "tests",
+     "confusing",
+     "suspicious"
+    ]
+   },
+   {
+    "rule": "python:S5869",
+    "severity": "MAJOR",
+    "type": "CODE_SMELL",
+    "file": "templates/tools/check-traceability.py",
+    "line": 39,
+    "message": "Remove duplicates in this character class.",
+    "effort": "5min",
+    "status": "OPEN",
+    "creationDate": "2026-09-28T12:36:00+0000",
+    "tags": [
+     "regex"
+    ]
+   },
+   {
+    "rule": "javascript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "file": "bin/init.js",
+    "line": 9,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "effort": "15min",
+    "status": "OPEN",
+    "creationDate": "2026-09-23T15:27:27+0000",
+    "tags": [
+     "cwe",
+     "former-hotspot"
+    ]
+   },
+   {
+    "rule": "python:S5713",
+    "severity": "MINOR",
+    "type": "CODE_SMELL",
+    "file": "templates/modules/project-scanner/scan.py",
+    "line": 70,
+    "message": "Remove this redundant Exception class; it derives from another which is already caught.",
+    "effort": "1min",
+    "status": "OPEN",
+    "creationDate": "2026-09-07T08:12:00+0000",
+    "tags": [
+     "error-handling",
+     "bad-practice",
+     "unused"
+    ]
+   }
+  ]
+ },
+ "issuesError": null,
+ "securityHotspots": {
+  "total": 0,
+  "items": []
+ },
+ "securityHotspotsError": null
+}

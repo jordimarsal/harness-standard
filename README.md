@@ -1,6 +1,8 @@
 # Harness Standard
 
 [![CI](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/jordimarsal/harness-standard/actions/workflows/ci.yml)
+[![Quality Gate](docs/images/badge-quality-gate.svg)](https://jordimarsal.github.io/harness-standard/)
+[![Code Smells](docs/images/badge-code-smells.svg)](https://jordimarsal.github.io/harness-standard/)
 [![built with harness-standard](assets/badge.svg)](https://github.com/jordimarsal/harness-standard)
 
 Install a repeatable process for coding agents in one command.
@@ -106,6 +108,20 @@ anything you edited is left untouched.
 - Plus `docs/` (specs, architecture, conventions — generated for your stack
   and chosen architecture, verification) and `harness/`
   (feature list, checkpoints, progress, logs, gates).
+
+## Quality
+
+Analyzed with SonarQube behind a custom quality gate ("Viatgecio Way") — current
+metrics and the raw `harness-report.json` live on the
+[quality page](https://jordimarsal.github.io/harness-standard/), published on
+GitHub Pages. There is deliberately no coverage number: the runtime suites are
+bash e2e install/security tests (`npm test`) and the Python tools in
+`templates/` are verified against the frozen `evals-fixtures/` corpus. After
+each scan, refresh the published assets with:
+
+```bash
+python3 scripts/sonar-quality.py   # reads ../harness-report.json, renders page + badges
+```
 
 ## Cost discipline
 

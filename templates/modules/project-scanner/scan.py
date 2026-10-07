@@ -67,7 +67,8 @@ class Scanner:
         try:
             text = path.read_text(encoding="utf-8")
             tree = ast.parse(text)
-        except (SyntaxError, OSError, UnicodeDecodeError, ValueError):
+        # UnicodeDecodeError derives from ValueError, so listing it would be redundant.
+        except (SyntaxError, OSError, ValueError):
             return None  # unreadable files are skipped, never fatal
         sf = SourceFile(path=rel, module=self._module_name(rel))
         for node in ast.walk(tree):
@@ -92,6 +93,10 @@ class Scanner:
         return ".".join(parts)
 
     def _build_indexes(self) -> None:
+        self._index_modules()
+        self._index_dependencies()
+
+    def _index_modules(self) -> None:
         # Index every dotted suffix of each module name; the longest key wins.
         # "src/core/models.py" registers "src.core.models", "core.models", "models".
         for sf in self.files:
@@ -101,6 +106,8 @@ class Scanner:
                 current = self._by_module.get(key)
                 if current is None or len(parts) > len(current.module.split(".")):
                     self._by_module[key] = sf
+
+    def _index_dependencies(self) -> None:
         # Reverse-dependency index, built once — never per query.
         for sf in self.files:
             for imp in sf.imports:
@@ -285,45 +292,59 @@ def json_impact(sc: Scanner, target: str) -> dict:
     }
 
 
-def main(argv: list[str]) -> int:
-    root = Path.cwd()
+class UsageError(Exception):
+    """Raised for malformed CLI usage; main prints it and exits 2."""
+
+
+COMMANDS = ("--summary", "--duplicates", "--impact", "--style")
+KNOWN_FLAGS = ("--json", *COMMANDS, "--root")
+
+
+def _take_value(flag: str, remaining: list[str]) -> str | None:
+    """Remove `flag` and its (required) value from remaining; None if absent."""
+    if flag not in remaining:
+        return None
+    i = remaining.index(flag)
+    if i + 1 >= len(remaining):
+        raise UsageError(f"{flag} requires a value")
+    value = remaining[i + 1]
+    del remaining[i : i + 2]
+    return value
+
+
+def _take_style(remaining: list[str]) -> int:
+    """Remove `--style` and its optional bare-number count; default 3."""
+    if "--style" not in remaining:
+        return 3
+    i = remaining.index("--style")
     style_n = 3
-    command: str | None = None
-    target: str | None = None
-    as_json = False
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a in ("--summary", "--duplicates"):
-            command = a
-        elif a == "--json":
-            as_json = True
-        elif a == "--impact":
-            command = a
-            i += 1
-            if i >= len(argv):
-                print("error: --impact requires a file path", file=sys.stderr)
-                return 2
-            target = argv[i]
-        elif a == "--style":
-            command = a
-            if i + 1 < len(argv) and argv[i + 1].isdigit():
-                i += 1
-                style_n = int(argv[i])
-        elif a == "--root":
-            i += 1
-            if i >= len(argv):
-                print("error: --root requires a path", file=sys.stderr)
-                return 2
-            root = Path(argv[i])
-        else:
-            print(f"error: unknown argument: {a}", file=sys.stderr)
-            return 2
-        i += 1
-    if command is None:
-        command = "--summary"
-    sc = Scanner(root)
-    sc.scan()
+    if i + 1 < len(remaining) and remaining[i + 1].isdigit():
+        style_n = int(remaining[i + 1])
+        del remaining[i + 1]
+    del remaining[i]
+    return style_n
+
+
+def parse_args(argv: list[str]) -> "tuple[str, str | None, int, bool, Path] | int":
+    """Parse CLI flags; return (command, target, style_n, as_json, root) or exit code 2."""
+    try:
+        as_json = "--json" in argv
+        command = next((c for c in COMMANDS if c in argv), "--summary")
+        remaining = list(argv)
+        target = _take_value("--impact", remaining)
+        root = Path(_take_value("--root", remaining) or Path.cwd())
+        style_n = _take_style(remaining)
+        unknown = [a for a in remaining if a.startswith("-") and a not in KNOWN_FLAGS]
+        if unknown:
+            raise UsageError(f"unknown argument: {unknown[0]}")
+    except UsageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return command, target, style_n, as_json, root
+
+
+def emit(sc: Scanner, command: str, target: str | None, style_n: int, as_json: bool) -> None:
+    """Print the selected command's report in the requested format."""
     if as_json:
         if command == "--summary":
             print(json.dumps(json_summary(sc)))
@@ -336,7 +357,7 @@ def main(argv: list[str]) -> int:
                 {"path": str(sf.path), "classes": sf.classes, "regions": sf.regions, "first_imports": sf.imports[:3]}
                 for sf in [f for f in sc.files if "test" not in f.path.name][:style_n]
             ]}))
-        return 0
+        return
     if command == "--summary":
         print(cmd_summary(sc))
     elif command == "--impact":
@@ -345,6 +366,16 @@ def main(argv: list[str]) -> int:
         print(cmd_duplicates(sc))
     elif command == "--style":
         print(cmd_style(sc, style_n))
+
+
+def main(argv: list[str]) -> int:
+    parsed = parse_args(argv)
+    if isinstance(parsed, int):
+        return parsed
+    command, target, style_n, as_json, root = parsed
+    sc = Scanner(root)
+    sc.scan()
+    emit(sc, command, target, style_n, as_json)
     return 0
 
 
