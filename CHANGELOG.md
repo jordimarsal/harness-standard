@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.7.2 — 2026-10-07
+
+- **fix(quality)**: all 12 SonarQube issues resolved. The template tools
+  (`check-traceability.py`, `validate-feature-list.py`, project-scanner
+  `scan.py`) are refactored into single-purpose helpers — behaviour verified
+  against the frozen `evals-fixtures/` corpus (PASS/FAIL unchanged) — and
+  `bin/init.js` now invokes `/bin/bash` by absolute path instead of resolving
+  it through a potentially writable `$PATH`.
+- **fix(tests)**: the backup-path assertion uses `find` instead of `ls`
+  (ShellCheck SC2012).
+- **docs(quality)**: SonarQube metrics published on GitHub Pages — quality
+  page with the raw scan report (`docs/quality/`) and static README badges,
+  refreshed after each scan with `scripts/sonar-quality.py`.
+
 ## v0.7.1 — 2026-10-06
 
 - **fix(updates)**: blank-line runs around the managed blocks (workflow,
