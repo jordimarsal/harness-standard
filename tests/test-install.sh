@@ -300,7 +300,8 @@ test_project_block_outside_edits_backed_up() {
   PASS=$((PASS + 1))
   assert_dir "$t" "$d/harness/backup"
   assert_no_grep "$t" "My own stray note" "$d/AGENTS.md"
-  assert_grep "$t" "My own stray note" "$(ls -d "$d"/harness/backup/*/ | head -n 1)/AGENTS.md"
+  local backup_dir; backup_dir=$(find "$d/harness/backup" -mindepth 1 -maxdepth 1 -type d | sort | head -n 1)
+  assert_grep "$t" "My own stray note" "$backup_dir/AGENTS.md"
 }
 
 test_claude_mode_typescript() {
