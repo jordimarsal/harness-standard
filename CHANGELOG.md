@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.7.3 — 2026-10-08
+
+- **fix(tools)**: `check-traceability.py` no longer reports a vacuous PASS.
+  Three hard guards now exit 2 with a clear stderr message: a root that is
+  not a directory (a bare `harness/feature_list.json` positional is a `--root`
+  and used to pass 0/0 silently), an `--feature` name without
+  `requirements.md`, and a requested feature that parses zero requirements.
+  A verdict without per-feature `## <name>: n/n` lines can no longer happen.
+  JS test support ported as well: `_search_tests_dir` now matches `test()/it()`
+  titles in `tests/**/*.js` (node:test) in addition to Python stems/functions —
+  node-based projects no longer fail traceability with "identifier not found".
+- **docs(workflow)**: the `hybrid.md` review-mode step (claude + opencode)
+  documents the correct invocation (`--feature <name>` / `--all`) and warns
+  about vacuous PASSes; adds the relative-assertion rule for suite tests
+  (`indexOf`/existence instead of global manifest positions or counts).
+- **tests**: new `tests/test-traceability.sh` covering the three guards, the
+  happy path with a generated fixture, and the workflow documentation greps.
+
 ## v0.7.2 — 2026-10-07
 
 - **fix(quality)**: all 12 SonarQube issues resolved. The template tools

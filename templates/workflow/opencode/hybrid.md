@@ -22,10 +22,17 @@ pending → [spec mode] → spec_ready → ⏈ HUMAN → in_progress → [batch 
    A claim without a log is not evidence — the rule the leader applies to
    subagents, applied to yourself.
 4. **Review mode.** Before requesting the Completion Gate: run
-   `python3 harness/tools/check-traceability.py harness/feature_list.json`,
+   `python3 harness/tools/check-traceability.py --feature <name>` (or `--all`
+   for the whole portfolio — never pass `feature_list.json` as a positional:
+   the tool treats it as `--root` and hard-rejects it with exit 2; a verdict
+   without per-feature `## <name>: n/n` lines is a vacuous PASS),
    save its output to `harness/specs/<name>/review.md`, and walk
    `.opencode/agent/reviewer.md` as a checklist. Reject your own work if any
    `R<n>` lacks evidence.
+   - **Suite assertions stay relative to the manifest**: use `indexOf`
+     ordering or existence checks, never global positions or counts
+     («últim tema», «N kates») — appending new themes/files must not break
+     previous features' suites.
 5. **Escalate to the full dispatch flow when any of these hold:** the feature
    has more than ~12 tasks; it touches files marked critical in
    `docs/conventions.md`; a batch stalls twice; or verification is subjective

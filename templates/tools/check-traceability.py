@@ -103,7 +103,7 @@ def _node_id_exists(root: Path, identifier: str) -> bool:
 
 
 def _search_tests_dir(root: Path, identifier: str) -> bool:
-    """File-name stem or any test function/class named `identifier` under tests/."""
+    """File-name stem, python function/class, or JS test title matching `identifier`."""
     import ast
 
     tests_dir = root / "tests"
@@ -122,6 +122,16 @@ def _search_tests_dir(root: Path, identifier: str) -> bool:
                 and node.name == identifier
             ):
                 return True
+    # JS test stacks (node:test): match the identifier inside a test()/it() title.
+    pat = re.compile(
+        rf"(?:^|[^A-Za-z0-9_])(?:test|it)\s*\(\s*['\"`][^'\"`]*{re.escape(identifier)}"
+    )
+    for tf in tests_dir.rglob("*.js"):
+        try:
+            if pat.search(tf.read_text(encoding="utf-8", errors="replace")):
+                return True
+        except OSError:
+            continue
     return False
 
 
@@ -247,7 +257,34 @@ def main(argv: list[str]) -> int:
         return parsed
     as_json, all_features, feature, root = parsed
 
-    results = [check_feature(root, n) for n in _selected_features(root, all_features, feature)]
+    specs_dir = root / "harness" / "specs"
+    if not root.is_dir():
+        print(
+            f"error: root is not a directory: {root}\n"
+            "       (a bare path like harness/feature_list.json is NOT a root; "
+            "use --feature NAME or --all from the repo root)",
+            file=sys.stderr,
+        )
+        return 2
+    if all_features:
+        names = _selected_features(root, all_features, feature)
+        if not names:
+            print("error: no `done` features with a spec directory found", file=sys.stderr)
+            return 2
+    else:
+        names = [feature]
+        if not (specs_dir / feature / "requirements.md").is_file():
+            print(f"error: unknown feature (no requirements.md): {feature}", file=sys.stderr)
+            return 2
+
+    results = [check_feature(root, n) for n in names]
+    empty = [r["name"] for r in results if r["requirements"] == 0]
+    if empty:
+        print(
+            f"error: no requirements parsed for: {', '.join(empty)} (nothing to verify)",
+            file=sys.stderr,
+        )
+        return 2
     verdict = "PASS" if all(r["gaps"] == [] for r in results) else "FAIL"
 
     if as_json:
