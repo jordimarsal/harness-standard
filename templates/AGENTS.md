@@ -44,6 +44,7 @@
 - **Do not mark a task `done` without green tests.** Run `harness/init.sh` and ensure the test block passes 100%.
 - **Do not skip the spec phase.** Every feature must go through `spec-author` and obtain human approval before touching code.
 - **Do not skip the human approval gate.** The leader stops the flow at `spec_ready` and waits.
+- **Commits follow Conventional Commits** (`<type>(<scope>)!: <summary>`) — `.git/hooks/commit-msg` enforces it; `--no-verify` is not a way around the rule.
 - **Document what you do** in `harness/progress/current.md` while working, not at the end.
 - **Leave the repository clean** before closing the session (see §5).
 - **If you don't know something, look in `docs/`** before inventing it.

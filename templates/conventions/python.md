@@ -12,6 +12,7 @@
 <!-- /naming -->
 <!-- structure -->
 - `src/` layout (`src/<pkg>/`, `tests/`), never a flat script pile; pyproject.toml is the single build/dependency source.
+- Tooling goes through **uv** by default: `uv add` / `uv remove` for dependencies, `uv sync` to materialize the locked venv, `uv run` to execute inside it; commit `uv.lock`.
 - Package by feature (`policies/`, `billing/`); `__init__.py` stays empty unless exporting a deliberate API.
 - CLI entry points via `if __name__ == "__main__"` only in thin launchers; logic lives in importable modules.
 <!-- /structure -->
@@ -30,6 +31,7 @@
 ## Code quality
 
 - `ruff check`, `ruff format` and `mypy --strict` are gates: green before every commit, no per-line suppressions without a why-comment.
+- Test and build commands run through uv (`uv run pytest tests`, `uv build`); a bare `python3 -m pytest` is the documented fallback only when uv is unavailable.
 - Logging via the stdlib `logging` (or structlog), parameterized: `log.info("policy %s approved", pid)` — never f-strings in log calls.
 - No `print()` outside CLIs; pin dependencies with hashes in CI (`pip install --require-hashes`).
 <!-- /quality -->

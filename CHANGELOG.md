@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.8.0 — 2026-10-09
+
+- **feat(uv)**: Python installs use [uv](https://docs.astral.sh/uv/) by
+  default — `uv run pytest tests` / `uv build` are rendered into the tool
+  config whenever uv is on PATH (no `uv.lock` required anymore). New `--no-uv`
+  flag keeps the plain `python3 -m pytest` commands; without uv the installer
+  warns and falls back instead of writing commands that would fail. The
+  Python conventions template documents uv as the default toolchain
+  (`uv add` / `uv sync` / `uv run`, commit `uv.lock`).
+- **feat(commits)**: every install — any tool, any workflow, `--hybrid`
+  included — enforces Conventional Commits. `templates/tools/commit-msg` is
+  copied to `harness/tools/` and wired as the repo's `commit-msg` hook
+  (recognized by its header marker and refreshed on reinstall; a pre-existing
+  foreign hook is never touched; non-git projects get the docs only). The rule
+  is documented in a new `## Commit Rules` conventions section, in
+  `AGENTS.md` hard rules, and in the claude workflow templates (full +
+  hybrid). `HARNESS.md` records whether the hook is enforced.
+- **feat(conventions)**: `docs/conventions.md` now ships a stack-agnostic
+  `## Design Principles` minimum bar in every install: semantic types (enum /
+  DTO / VO / dataclass) over loose dictionaries, one concept per class and one
+  responsibility per method, no nested try/catch, composition over
+  inheritance, immutability (final fields, unmodifiable collections), and
+  tell-don't-ask with rich value objects. Language sections may add rules,
+  never subtract these.
+- **tests**: new `test_python_uv_default` (uv default + `--no-uv` override
+  with a stubbed uv) and `test_conventional_commits` (hook in git repos,
+  rejected/accepted subjects, merge bypass, foreign hook preserved across
+  `--update`, docs in opencode + `--hybrid` claude installs); `test_python_stack`
+  now runs with a uv-free PATH so the fallback is asserted deterministically.
+
 ## v0.7.3 — 2026-10-08
 
 - **fix(tools)**: `check-traceability.py` no longer reports a vacuous PASS.

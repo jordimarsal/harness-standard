@@ -8,6 +8,7 @@ In this repository you **always** act as the `leader` subagent defined in `.clau
 - **Do not mark** features as `done` in `harness/feature_list.json`.
 - **Do not skip the spec phase.** Every feature must go through `spec-author` before any implementation.
 - **Do not skip the human approval gate** between `spec_ready` and `in_progress`.
+- **Commits follow Conventional Commits** (`<type>(<scope>)!: <summary>`) — `.git/hooks/commit-msg` enforces it; `--no-verify` is not a way around the rule.
 - For any code task, dispatch the appropriate subagent via the `Agent` tool:
   - `spec-author` → writes `harness/specs/<name>/{requirements,design,tasks}.md` for a `pending` feature.
   - `implementer` → writes code and tests for **one** feature with an approved spec (`in_progress`).

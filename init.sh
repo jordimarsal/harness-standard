@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # init.sh — Install the standardized harness into a project
 #
-# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--hybrid|--workflow=full|hybrid] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]
+# Usage: cd /path/to/your/project && /path/to/harness-standard/init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--hybrid|--workflow=full|hybrid] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2] [--no-uv]
 #
 # Detects tech stack, asks which AI tool drives the harness (claude / opencode),
 # copies templates and adapts configuration.
@@ -78,6 +78,7 @@ ARCH_FLAG=""
 REMOVED_MODULES=()
 AUDIT_LEVEL=""
 WORKFLOW_FLAG=""
+NO_UV=0
 for arg in "$@"; do
   case "$arg" in
     --tool=claude)   TOOL="claude" ;;
@@ -93,9 +94,10 @@ for arg in "$@"; do
     --audit-level=*) AUDIT_LEVEL="${arg#--audit-level=}" ;;
     --hybrid)        WORKFLOW_FLAG="hybrid" ;;
     --workflow=*)    WORKFLOW_FLAG="${arg#--workflow=}" ;;
+    --no-uv)         NO_UV=1 ;;
     *)
       fail "Unknown argument: $arg"
-      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2]"
+      fail "Usage: init.sh [--tool=claude|opencode] [--modules=m1,m2] [--audit-level=basic|standard|strict] [--force] [--update] [--backup[=DIR]] [--architecture=<name>] [--add-modules=m1,m2] [--remove-modules=m1,m2] [--no-uv]"
       exit 1
       ;;
   esac
@@ -493,12 +495,22 @@ case "$STACK" in
     fi
     ;;
   python)
-    if command -v uv >/dev/null 2>&1 && [ -f "uv.lock" ]; then
+    # Python installs use uv by default (--no-uv opts out). Without uv on
+    # PATH the installer falls back to the plain interpreter instead of
+    # writing commands that would fail in the project's gates.
+    if [ "$NO_UV" -eq 1 ]; then
+      TEST_CMD="python3 -m pytest -q tests"
+      BUILD_CMD="echo 'no build step for python'"
+      info "Python tooling: python3/pytest (--no-uv)"
+    elif command -v uv >/dev/null 2>&1; then
       TEST_CMD="uv run pytest tests"
+      BUILD_CMD="uv build"
+      info "Python tooling: uv (pass --no-uv to use python3/pytest directly)"
     else
       TEST_CMD="python3 -m pytest -q tests"
+      BUILD_CMD="echo 'no build step for python'"
+      warn "uv not found — falling back to python3/pytest (install: https://docs.astral.sh/uv/)"
     fi
-    BUILD_CMD="echo 'no build step for python'"
     ;;
   rust)
     TEST_CMD="cargo test"
@@ -1032,6 +1044,8 @@ cp "$TEMPLATES_DIR/tools/validate-feature-list.py" ./harness/tools/
 chmod +x ./harness/tools/validate-feature-list.py
 cp "$TEMPLATES_DIR/tools/check-traceability.py" ./harness/tools/
 chmod +x ./harness/tools/check-traceability.py
+cp "$TEMPLATES_DIR/tools/commit-msg" ./harness/tools/commit-msg
+chmod +x ./harness/tools/commit-msg
 cp "$TEMPLATES_DIR/CHECKPOINTS.md" ./harness/CHECKPOINTS.md
 [ -f "./harness/progress/current.md" ] || cp "$TEMPLATES_DIR/progress/current.md" ./harness/progress/current.md
 [ -f "./harness/progress/history.md" ] || cp "$TEMPLATES_DIR/progress/history.md" ./harness/progress/history.md
@@ -1157,6 +1171,33 @@ if [ -f "harness/wekan.json" ]; then
   fi
 fi
 
+# ── Conventional Commits (every install: any tool, any workflow) ──
+# Enforced mechanically via the commit-msg hook; docs/conventions.md and the
+# entry file document the rule for the agents. A pre-existing foreign hook is
+# never touched; ours is recognized by its header marker and refreshed.
+HOOK_INSTALLED=0
+ensure_conventional_commits() {
+  local git_dir hook src marker
+  src="harness/tools/commit-msg"
+  marker="installed by harness-standard"
+  git_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+  if [ -z "$git_dir" ]; then
+    info "Not a git repository — commit-msg hook skipped (rule still documented in docs/conventions.md)"
+    return 0
+  fi
+  hook="$git_dir/hooks/commit-msg"
+  mkdir -p "$git_dir/hooks"
+  if [ -f "$hook" ] && ! grep -qF "$marker" "$hook"; then
+    warn "Existing commit-msg hook kept — source it or chain $src to add Conventional Commits checks"
+    return 0
+  fi
+  cp "$src" "$hook"
+  chmod +x "$hook"
+  HOOK_INSTALLED=1
+  ok "Conventional Commits enforced: $hook"
+}
+ensure_conventional_commits
+
 # ── Validation ─────────────────────────────────────────
 echo ""
 echo "── Validation ──────────────────────────────────────────"
@@ -1205,6 +1246,7 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 fi
 check_file "harness/init.sh"
+check_file "harness/tools/commit-msg"
 check_file "harness/progress/current.md"
 check_file "harness/progress/history.md"
 check_file "docs/architecture.md"
@@ -1242,6 +1284,11 @@ if [ $EXIT_CODE -eq 0 ]; then
   if [ "$WORKFLOW" = "hybrid" ]; then
     WORKFLOW_NOTE=" — one in-session agent; same human gates; evidence logs in harness/logs/ (see the workflow section of $ENTRY_FILE)"
   fi
+  COMMITS_NOTE=""
+  if [ "$HOOK_INSTALLED" -eq 1 ]; then
+    COMMITS_NOTE="
+- **Commits:** Conventional Commits — enforced by \`.git/hooks/commit-msg\` (source: \`harness/tools/commit-msg\`)"
+  fi
   cat > HARNESS.md <<EOF
 # Harness — $PROJECT_NAME
 
@@ -1252,7 +1299,7 @@ Installed with [harness-standard](https://github.com/jordimarsal/harness-standar
 - **Workflow:** $WORKFLOW$WORKFLOW_NOTE
 - **Roles:** Leader · Spec Author · Implementer · Reviewer (\`$ROLES_DIR\`)
 - **Gates:** \`harness/CHECKPOINTS.md\` · \`docs/verification.md\`
-- **Process:** \`docs/specs.md\` — Spec-Driven Development with a human approval gate
+- **Process:** \`docs/specs.md\` — Spec-Driven Development with a human approval gate$COMMITS_NOTE
 
 ## Next
 

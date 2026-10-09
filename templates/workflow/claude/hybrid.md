@@ -14,6 +14,7 @@ never who approves.
   the human approval gate before touching `src/` or `tests/`.
 - **One batch at a time** (2–4 consecutive tasks, per
   `.claude/agents/implementer.md`). Never a whole feature in one sitting.
+- **Commits follow Conventional Commits** (`<type>(<scope>)!: <summary>`) — `.git/hooks/commit-msg` enforces it; `--no-verify` is not a way around the rule.
 - **Evidence rule:** after every batch run the gates yourself
   (`harness/init.sh`) and save the full output to
   `harness/logs/<feature>/batch-<n>.log`. Tick tasks `[x]` only with that log

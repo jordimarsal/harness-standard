@@ -5,7 +5,10 @@
 #   curl -fsSL https://jordimp.net/harness/install.sh | bash -s -- --tool=claude
 #   bash install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update]
 #                   [--hybrid|--workflow=full|hybrid] [--modules=m1,m2] [--audit-level=basic|standard|strict]
-#                   [--modules=m1,m2] [--audit-level=basic|standard|strict] [--backup[=DIR]]
+#                   [--modules=m1,m2] [--audit-level=basic|standard|strict] [--backup[=DIR]] [--no-uv]
+#
+# --no-uv: python installs use uv by default; this flag keeps python3/pytest
+# commands even when uv is on PATH.
 #
 # --update refreshes an installed harness, reusing its stored tool/modules/audit
 # level; without --ref it fetches the newest v* tag (fresh installs stay pinned
@@ -19,7 +22,7 @@
 set -euo pipefail
 
 REPO_URL="${HARNESS_REPO_URL:-https://github.com/jordimarsal/harness-standard.git}"
-REF="${HARNESS_REF:-v0.7.1}"
+REF="${HARNESS_REF:-v0.8.0}"
 REF_GIVEN=0
 UPDATE=0
 DEST="."
@@ -38,10 +41,11 @@ while [ $# -gt 0 ]; do
     --update)        UPDATE=1; PASSTHRU+=(--update) ;;
     --hybrid)        PASSTHRU+=(--hybrid) ;;
     --workflow=*)    PASSTHRU+=("$1") ;;
+    --no-uv)         PASSTHRU+=(--no-uv) ;;
     --backup|--backup=*) PASSTHRU+=("$1") ;;
     --modules=*|--audit-level=*) PASSTHRU+=("$1") ;;
     -h|--help)
-      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update] [--modules=...] [--audit-level=...] [--backup[=DIR]] [--hybrid|--workflow=full|hybrid]"
+      echo "Usage: install.sh [--tool=claude|opencode] [--dest DIR] [--ref REF|latest] [--force] [--update] [--modules=...] [--audit-level=...] [--backup[=DIR]] [--hybrid|--workflow=full|hybrid] [--no-uv]"
       exit 0 ;;
     *) echo "install.sh: unknown argument: $1" >&2; exit 1 ;;
   esac

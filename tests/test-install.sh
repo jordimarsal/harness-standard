@@ -121,6 +121,17 @@ new_project() {  # new_project <name> — echoes the created dir
   echo "$d"
 }
 
+path_without() {  # path_without <tool> — echo $PATH minus directories providing <tool>
+  local tool="$1" out="" oldIFS="$IFS" d
+  IFS=':'
+  for d in $PATH; do
+    [ -x "$d/$tool" ] && continue
+    out="${out:+$out:}$d"
+  done
+  IFS="$oldIFS"
+  printf '%s' "$out"
+}
+
 run_test() {  # run_test <name> — echoes header
   echo ""
   echo "=== $1 ==="
@@ -476,7 +487,9 @@ test_python_stack() {
   run_test "$t"
   local d; d=$(new_project "python-stack")
   touch "$d/requirements.txt"
-  (cd "$d" && "$INIT" --tool=claude >/dev/null) || {
+  # PATH without uv: exercises the documented python3 fallback deterministically
+  # (the host running the suite may or may not have uv installed).
+  (cd "$d" && PATH="$(path_without uv)" "$INIT" --tool=claude >/dev/null) || {
     FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: init.sh exited non-zero"); return
   }
   PASS=$((PASS + 1))
@@ -494,6 +507,107 @@ test_python_stack() {
   else
     PASS=$((PASS + 1))
   fi
+}
+
+test_python_uv_default() {
+  local t="python installs default to uv; --no-uv keeps python3/pytest"
+  run_test "$t"
+  local stub; stub="$TMP_ROOT/uv-stub-bin"
+  mkdir -p "$stub"
+  printf '#!/usr/bin/env sh\nexit 0\n' > "$stub/uv"
+  chmod +x "$stub/uv"
+
+  # Default with uv on PATH: uv commands land in the tool config.
+  local d; d=$(new_project "python-uv")
+  touch "$d/pyproject.toml"
+  (cd "$d" && PATH="$stub:$PATH" "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: uv install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "uv run pytest tests" "$d/opencode.json"
+  assert_grep "$t" "uv build" "$d/opencode.json"
+  assert_grep "$t" 'Tooling goes through \*\*uv\*\*' "$d/docs/conventions.md"
+
+  # --no-uv wins even with uv on PATH: plain interpreter commands.
+  local d2; d2=$(new_project "python-nouv")
+  touch "$d2/requirements.txt"
+  (cd "$d2" && PATH="$stub:$PATH" "$INIT" --tool=claude --no-uv >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: --no-uv install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "python3 -m pytest" "$d2/.claude/settings.json"
+  assert_no_grep "$t" "uv run" "$d2/.claude/settings.json"
+}
+
+test_conventional_commits() {
+  local t="conventional commits enforced on every install (any option, even --hybrid)"
+  run_test "$t"
+
+  # (a) Non-git project: tool copied, install succeeds, no hook anywhere.
+  local d; d=$(new_project "cc-nogit")
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: non-git install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/harness/tools/commit-msg"
+  assert_no_file "$t" "$d/.git/hooks/commit-msg"
+
+  # (b) Git repo: hook installed, executable, and it enforces the format.
+  d=$(new_project "cc-git")
+  git init -q "$d"
+  (cd "$d" && "$INIT" --tool=opencode >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: git install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_file "$t" "$d/.git/hooks/commit-msg"
+  assert_executable "$t" "$d/.git/hooks/commit-msg"
+  printf 'not a conventional subject\n' > "$d/msg.txt"
+  if (cd "$d" && ./.git/hooks/commit-msg msg.txt >/dev/null 2>&1); then
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: hook accepted a non-conventional subject")
+    echo "    FAIL: hook accepted 'not a conventional subject'"
+  else
+    PASS=$((PASS + 1))
+  fi
+  printf 'feat(auth): add refresh-token rotation\n' > "$d/msg.txt"
+  if (cd "$d" && ./.git/hooks/commit-msg msg.txt >/dev/null 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: hook rejected a conventional subject")
+    echo "    FAIL: hook rejected 'feat(auth): add refresh-token rotation'"
+  fi
+  printf "Merge branch 'feature/x'\n" > "$d/msg.txt"
+  if (cd "$d" && ./.git/hooks/commit-msg msg.txt >/dev/null 2>&1); then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: hook rejected a merge subject")
+    echo "    FAIL: hook rejected a Merge subject"
+  fi
+
+  # (c) A foreign commit-msg hook is never clobbered (--update keeps it).
+  printf '#!/bin/sh\ncustom-hook\n' > "$d/.git/hooks/commit-msg"
+  chmod +x "$d/.git/hooks/commit-msg"
+  (cd "$d" && "$INIT" --update >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: update failed"); return
+  }
+  assert_grep "$t" "custom-hook" "$d/.git/hooks/commit-msg"
+
+  # (d) Docs carry the rule and the design principles in every install.
+  assert_grep "$t" "## Design Principles" "$d/docs/conventions.md"
+  assert_grep "$t" "unmodifiable" "$d/docs/conventions.md"
+  assert_grep "$t" "Tell, don't ask" "$d/docs/conventions.md"
+  assert_grep "$t" "## Commit Rules" "$d/docs/conventions.md"
+  assert_grep "$t" "Conventional Commits" "$d/AGENTS.md"
+
+  # (e) --hybrid + claude: same enforcement, rule rendered in the entry file.
+  local dc; dc=$(new_project "cc-hybrid-claude")
+  git init -q "$dc"
+  (cd "$dc" && "$INIT" --tool=claude --hybrid >/dev/null) || {
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$t: claude hybrid install failed"); return
+  }
+  PASS=$((PASS + 1))
+  assert_grep "$t" "Conventional Commits" "$dc/CLAUDE.md"
+  assert_grep "$t" "harness/tools/commit-msg" "$dc/HARNESS.md"
+  assert_file "$t" "$dc/.git/hooks/commit-msg"
 }
 
 test_force_reinstall_preserves_state() {
@@ -1607,6 +1721,8 @@ test_force_reinstall_preserves_state
 test_force_switch_tool
 test_verify_script_runs
 test_python_stack
+test_python_uv_default
+test_conventional_commits
 test_module_manifests_valid
 test_modules_install
 test_default_install_no_modules

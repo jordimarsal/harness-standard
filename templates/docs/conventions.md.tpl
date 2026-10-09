@@ -42,4 +42,38 @@ understood without comments, rewrite the code.
 
 ---
 
+## Design Principles
+
+Minimum bar for every stack and language — the language sections above may add
+rules, never subtract these:
+
+- **Semantic types over loose dictionaries.** Model domain concepts as enums,
+  DTOs, value objects, records or dataclasses instead of passing raw
+  dictionaries/maps around — the type name carries the meaning.
+- **One concept per class, one responsibility per method** (Single
+  Responsibility Principle).
+- **No nested try/catch.** Extract a named function that handles one failure
+  mode instead.
+- **Prefer composition over inheritance.**
+- **Prefer immutability:** final fields, immutable objects, unmodifiable
+  collections — initialize once, never mutate shared state in place.
+- **Tell, don't ask.** Behavior lives on the object that owns the data; value
+  objects are rich (they validate and act), not anemic data bags.
+
+---
+
+## Commit Rules
+
+Every commit in this repository follows
+[Conventional Commits](https://www.conventionalcommits.org/):
+
+- Format: `<type>(<optional scope>)!: <summary>` — e.g. `feat(auth): add refresh-token rotation`.
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `release`, `revert`.
+- `!` (or a `BREAKING CHANGE:` footer) marks a breaking change.
+- `.git/hooks/commit-msg` (source: `harness/tools/commit-msg`) enforces the
+  format on every commit; `--no-verify` is reserved for exceptional cases,
+  never a workaround.
+
+---
+
 {{QUALITY_SECTION}}

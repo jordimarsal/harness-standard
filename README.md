@@ -30,6 +30,37 @@ spec-author/implementer/reviewer subagents; hybrid runs the same SDD flow and
 human gates in one session, with mandatory evidence logs. The choice is stored
 in `harness/feature_list.json` and `--update` keeps it.
 
+Python projects use **uv** by default: test/build commands are rendered as
+`uv run pytest tests` / `uv build`. Pass `--no-uv` to keep plain
+`python3 -m pytest` commands (re-pass it on `--update` — commands are
+re-detected on every run), or install uv and the next update picks it up.
+
+## Conventional Commits
+
+Every install — any tool, any workflow, `--hybrid` included — enforces
+[Conventional Commits](https://www.conventionalcommits.org/) in your
+repository. The installer wires a `commit-msg` hook
+(`.git/hooks/commit-msg`, source: `harness/tools/commit-msg`) that **rejects
+any commit whose subject does not follow the format**. Write commits like:
+
+```text
+feat(auth): add refresh-token rotation
+fix(parser): handle empty payloads
+chore!: drop Node 18 support
+```
+
+- Format: `<type>(<optional scope>)!: <summary>` — `!` (or a
+  `BREAKING CHANGE:` footer) marks a breaking change.
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`,
+  `ci`, `chore`, `release`, `revert`.
+- `Merge …` and `Revert …` subjects bypass the check.
+- `--no-verify` exists for exceptional cases; it is not a way around the rule —
+  the agents are held to the same standard by the entry-file hard rules and
+  `docs/conventions.md`.
+- Not a git repository? The hook is skipped and the rule stays documented.
+- A `commit-msg` hook you installed yourself is never overwritten — keep it
+  and chain `harness/tools/commit-msg` to add the check.
+
 Project-specific additions to the entry file (`CLAUDE.md` / `AGENTS.md`) go
 inside the `harness:project` block at the end of the file: the installer
 preserves that block verbatim across `--update`/`--force` and never counts it
@@ -108,6 +139,11 @@ anything you edited is left untouched.
 - Plus `docs/` (specs, architecture, conventions — generated for your stack
   and chosen architecture, verification) and `harness/`
   (feature list, checkpoints, progress, logs, gates).
+
+`docs/conventions.md` ships a stack-agnostic minimum bar in every install
+(semantic types over loose dictionaries, SRP, no nested try/catch, composition
+over inheritance, immutability, tell-don't-ask) plus the Conventional Commits
+commit rules.
 
 ## Quality
 
